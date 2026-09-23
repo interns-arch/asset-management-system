@@ -1,5 +1,4 @@
 import 'reflect-metadata';
-import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
@@ -14,7 +13,7 @@ const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 export async function createApp() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    logger: process.env.NODE_ENV === 'test' ? ['error'] : ['log', 'warn', 'error'],
+    logger: process.env.NODE_ENV === 'test' ? ['error'] : ['warn', 'error'],
   });
   app.setGlobalPrefix('api');
   app.set('trust proxy', 'loopback');
@@ -64,7 +63,7 @@ async function bootstrap() {
   const app = await createApp();
   const port = Number(process.env.PORT ?? 3000);
   await app.listen(port);
-  new Logger('Bootstrap').log(`API ready on http://localhost:${port}/api`);
+  console.log(`✔ API ready on http://localhost:${port}/api`);
 }
 
 if (require.main === module) {

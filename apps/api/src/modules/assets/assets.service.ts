@@ -197,6 +197,8 @@ export class AssetsService {
     const ownership = listFilter(q.ownership, OWNERSHIP_TYPES);
     if (ownership.length) conds.push(inArray(assets.ownership, ownership));
 
+    const ids = listFilter(q.ids).filter((id) => uuidParam(id)).slice(0, 500);
+    if (ids.length) conds.push(inArray(assets.id, ids));
     const categoryId = uuidParam(q.categoryId);
     if (categoryId) conds.push(eq(assets.categoryId, categoryId));
     const typeIds = listFilter(q.assetTypeId).filter((id) => uuidParam(id));

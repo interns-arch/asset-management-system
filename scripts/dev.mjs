@@ -4,7 +4,9 @@ import path from 'node:path';
 import { API_DIST, ensureDatabase, localUrl, ROOT, run, startPostgres, TSC, VITE } from './pg.mjs';
 
 const DATABASE_URL = process.env.DATABASE_URL ?? localUrl('eam');
-const env = { DATABASE_URL, NODE_ENV: 'development' };
+const API_PORT = process.env.API_PORT ?? '3000';
+// PORT is set explicitly so an inherited PORT (e.g. from a preview tool) cannot move the API.
+const env = { DATABASE_URL, NODE_ENV: 'development', PORT: API_PORT, API_PORT };
 
 const db = await startPostgres();
 await ensureDatabase('eam');

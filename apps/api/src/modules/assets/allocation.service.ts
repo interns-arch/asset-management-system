@@ -219,7 +219,7 @@ export class AllocationService {
           entityLabel: old.holderName,
           action: 'ASSET_TRANSFERRED_OUT',
           summary: `${asset.assetTag} ${asset.name} transferred to ${holder.name}`,
-          assetId: asset.id,
+          metadata: { assetId: asset.id },
         });
       }
       await this.afterNewEmployeeHolder(actor, asset, holder, alloc);

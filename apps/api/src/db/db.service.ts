@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
@@ -25,6 +25,11 @@ export class DbService implements OnModuleDestroy {
   readonly pool = new pg.Pool({ connectionString: databaseUrl(), max: Number(process.env.DB_POOL_SIZE ?? 20) });
   readonly root: Database = drizzle(this.pool, { schema });
   private readonly als = new AsyncLocalStorage<Tx>();
+
+  constructor() {
+    // An idle connection can be dropped (DB restart, failover). Log it; the pool reconnects on next use.
+    this.pool.on('error', (err) => new Logger('Database').warn(`Idle connection error: ${err.message}`));
+  }
 
   get db(): Executor {
     return this.als.getStore() ?? this.root;
