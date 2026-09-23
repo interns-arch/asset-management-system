@@ -67,7 +67,7 @@ export class EmployeesService {
       if (id) conds.push(eq(col, id));
     }
     if (q.hasAssets === '1') {
-      conds.push(sql`exists (select 1 from allocations al where al.employee_id = ${employees.id} and al.status = 'ACTIVE')`);
+      conds.push(sql`exists (select 1 from allocations al where al.employee_id = employees.id and al.status = 'ACTIVE')`);
     }
     if (p.search) {
       const like = likePattern(p.search);
@@ -100,8 +100,8 @@ export class EmployeesService {
           locationName: locations.name,
           companyName: companies.name,
           managerName: manager.fullName,
-          assetCount: sql<number>`(select coalesce(sum(al.quantity), 0)::int from allocations al where al.employee_id = ${employees.id} and al.status = 'ACTIVE')`,
-          openExitCaseId: sql<string | null>`(select c.id from exit_cases c where c.employee_id = ${employees.id} and c.status = 'OPEN' limit 1)`,
+          assetCount: sql<number>`(select coalesce(sum(al.quantity), 0)::int from allocations al where al.employee_id = employees.id and al.status = 'ACTIVE')`,
+          openExitCaseId: sql<string | null>`(select c.id from exit_cases c where c.employee_id = employees.id and c.status = 'OPEN' limit 1)`,
         })
         .from(employees)
         .leftJoin(departments, eq(departments.id, employees.departmentId))

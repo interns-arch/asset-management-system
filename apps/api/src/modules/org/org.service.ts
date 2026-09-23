@@ -44,8 +44,8 @@ const CONFIG: Record<OrgKind, OrgConfig> = {
     labels: { name: 'Name', code: 'Code', legalName: 'Legal name', address: 'Address' },
     search: [companies.name, companies.code, companies.legalName],
     extras: () => ({
-      employeeCount: sql<number>`(select count(*)::int from employees e where e.company_id = ${companies.id} and e.status <> 'EXITED')`,
-      assetCount: sql<number>`(select count(*)::int from assets a where a.owner_company_id = ${companies.id})`,
+      employeeCount: sql<number>`(select count(*)::int from employees e where e.company_id = companies.id and e.status <> 'EXITED')`,
+      assetCount: sql<number>`(select count(*)::int from assets a where a.owner_company_id = companies.id)`,
     }),
   },
   departments: {
@@ -59,8 +59,8 @@ const CONFIG: Record<OrgKind, OrgConfig> = {
     extras: () => ({
       companyName: deptCompany.name,
       parentName: parentDept.name,
-      employeeCount: sql<number>`(select count(*)::int from employees e where e.department_id = ${departments.id} and e.status <> 'EXITED')`,
-      assetCount: sql<number>`(select count(*)::int from assets a where a.holder_type = 'DEPARTMENT' and a.holder_id = ${departments.id})`,
+      employeeCount: sql<number>`(select count(*)::int from employees e where e.department_id = departments.id and e.status <> 'EXITED')`,
+      assetCount: sql<number>`(select count(*)::int from assets a where a.holder_type = 'DEPARTMENT' and a.holder_id = departments.id)`,
     }),
     joins: (q) => q.leftJoin(deptCompany, eq(deptCompany.id, departments.companyId)).leftJoin(parentDept, eq(parentDept.id, departments.parentId)),
   },
@@ -75,8 +75,8 @@ const CONFIG: Record<OrgKind, OrgConfig> = {
     extras: () => ({
       companyName: locCompany.name,
       parentName: parentLoc.name,
-      assetCount: sql<number>`(select count(*)::int from assets a where a.location_id = ${locations.id})`,
-      employeeCount: sql<number>`(select count(*)::int from employees e where e.location_id = ${locations.id} and e.status <> 'EXITED')`,
+      assetCount: sql<number>`(select count(*)::int from assets a where a.location_id = locations.id)`,
+      employeeCount: sql<number>`(select count(*)::int from employees e where e.location_id = locations.id and e.status <> 'EXITED')`,
     }),
     joins: (q) => q.leftJoin(locCompany, eq(locCompany.id, locations.companyId)).leftJoin(parentLoc, eq(parentLoc.id, locations.parentId)),
   },
@@ -88,8 +88,8 @@ const CONFIG: Record<OrgKind, OrgConfig> = {
     labels: { name: 'Name', code: 'Code', contactName: 'Contact', email: 'Email', phone: 'Phone', website: 'Website', address: 'Address', notes: 'Notes' },
     search: [vendors.name, vendors.code, vendors.contactName, vendors.email],
     extras: () => ({
-      assetCount: sql<number>`(select count(*)::int from assets a where a.vendor_id = ${vendors.id})`,
-      heldCount: sql<number>`(select count(*)::int from assets a where a.holder_type = 'VENDOR' and a.holder_id = ${vendors.id})`,
+      assetCount: sql<number>`(select count(*)::int from assets a where a.vendor_id = vendors.id)`,
+      heldCount: sql<number>`(select count(*)::int from assets a where a.holder_type = 'VENDOR' and a.holder_id = vendors.id)`,
     }),
   },
 };

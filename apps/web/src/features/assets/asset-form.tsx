@@ -72,7 +72,7 @@ export default function AssetForm({ open, onOpenChange, record, defaults }: Form
     ...(editing ? { version: asset.version } : { assetTypeId: typeId ?? '' }),
   });
   useEffect(() => {
-    if (!editing) form.setValue('assetTypeId', typeId ?? '');
+    if (!editing) form.setValue('assetTypeId' as 'name', typeId ?? '');
   }, [typeId, editing, form]);
 
   // Default owner company for new assets.

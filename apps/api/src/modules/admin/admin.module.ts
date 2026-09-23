@@ -105,7 +105,7 @@ export class AdminService {
         description: roles.description,
         permissions: roles.permissions,
         isSystem: roles.isSystem,
-        userCount: sql<number>`(select count(*)::int from users u where u.role_id = ${roles.id})`,
+        userCount: sql<number>`(select count(*)::int from users u where u.role_id = roles.id)`,
       })
       .from(roles)
       .orderBy(asc(roles.createdAt));

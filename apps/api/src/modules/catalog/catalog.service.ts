@@ -72,8 +72,8 @@ export class CatalogService {
       db
         .select({
           category: assetCategories,
-          typeCount: sql<number>`(select count(*)::int from asset_types t where t.category_id = ${assetCategories.id})`,
-          assetCount: sql<number>`(select count(*)::int from assets a where a.category_id = ${assetCategories.id})`,
+          typeCount: sql<number>`(select count(*)::int from asset_types t where t.category_id = asset_categories.id)`,
+          assetCount: sql<number>`(select count(*)::int from assets a where a.category_id = asset_categories.id)`,
         })
         .from(assetCategories)
         .orderBy(asc(assetCategories.sortOrder), asc(assetCategories.name)),
@@ -169,9 +169,9 @@ export class CatalogService {
         categoryName: assetCategories.name,
         categoryIcon: assetCategories.icon,
         categoryColor: assetCategories.color,
-        assetCount: sql<number>`(select count(*)::int from assets a where a.asset_type_id = ${assetTypes.id})`,
-        availableCount: sql<number>`(select count(*)::int from assets a where a.asset_type_id = ${assetTypes.id} and a.status = 'AVAILABLE')`,
-        fieldCount: sql<number>`(select count(*)::int from field_definitions f where f.asset_type_id = ${assetTypes.id} and f.archived_at is null)`,
+        assetCount: sql<number>`(select count(*)::int from assets a where a.asset_type_id = asset_types.id)`,
+        availableCount: sql<number>`(select count(*)::int from assets a where a.asset_type_id = asset_types.id and a.status = 'AVAILABLE')`,
+        fieldCount: sql<number>`(select count(*)::int from field_definitions f where f.asset_type_id = asset_types.id and f.archived_at is null)`,
       })
       .from(assetTypes)
       .innerJoin(assetCategories, eq(assetCategories.id, assetTypes.categoryId))

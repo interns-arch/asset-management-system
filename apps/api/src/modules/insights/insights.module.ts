@@ -117,8 +117,8 @@ export class DashboardService {
           lastWorkingDate: exitCases.lastWorkingDate,
           employeeName: employees.fullName,
           employeeId: employees.id,
-          total: sql<number>`(select count(*)::int from exit_items i where i.exit_case_id = ${exitCases.id})`,
-          pending: sql<number>`(select count(*)::int from exit_items i where i.exit_case_id = ${exitCases.id} and i.status in ('PENDING', 'MISSING'))`,
+          total: sql<number>`(select count(*)::int from exit_items i where i.exit_case_id = exit_cases.id)`,
+          pending: sql<number>`(select count(*)::int from exit_items i where i.exit_case_id = exit_cases.id and i.status in ('PENDING', 'MISSING'))`,
         })
         .from(exitCases)
         .innerJoin(employees, eq(employees.id, exitCases.employeeId))

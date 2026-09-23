@@ -65,6 +65,22 @@ async function main() {
     const [row] = await dbs.root.insert(roles).values({ name: r.name, description: r.description, permissions: r.permissions, isSystem: true }).returning();
     roleIds[r.name] = row.id;
   }
+
+  // Production bootstrap: roles + one admin from the environment, no demo data.
+  if (process.argv.includes('--bootstrap')) {
+    const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+    const password = process.env.ADMIN_PASSWORD ?? '';
+    if (!email || password.length < 8) {
+      console.error('✖ Set ADMIN_EMAIL and ADMIN_PASSWORD (min 8 characters) to create the first admin.');
+      process.exitCode = 1;
+      await app.close();
+      return;
+    }
+    await dbs.root.insert(users).values({ email, name: process.env.ADMIN_NAME ?? 'Administrator', passwordHash: await hashPassword(password), roleId: roleIds.Admin });
+    console.log(`✔ Created roles and the first admin (${email}). Build your catalog under Settings → Asset catalog.`);
+    await app.close();
+    return;
+  }
   const passwordHash = await hashPassword(DEMO_PASSWORD);
   const [adminUser] = await dbs.root
     .insert(users)

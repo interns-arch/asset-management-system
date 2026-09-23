@@ -28,6 +28,8 @@ export async function createApp() {
           fontSrc: ["'self'", 'data:'],
           connectSrc: ["'self'"],
           mediaSrc: ["'self'", 'blob:'],
+          // HTTPS is enforced by the reverse proxy; upgrading here breaks plain-HTTP LAN installs.
+          upgradeInsecureRequests: null,
         },
       },
     }),
@@ -50,7 +52,8 @@ export async function createApp() {
   // In production the API also serves the built web app (single origin, no CORS).
   const webDist = path.resolve(__dirname, '../../web/dist');
   if (existsSync(path.join(webDist, 'index.html'))) {
-    app.useStaticAssets(webDist, { index: false, maxAge: '1h' });
+    // redirect: false — "/assets" is an app route, not the build's assets/ folder.
+    app.useStaticAssets(webDist, { index: false, redirect: false, maxAge: '1h' });
     app.use((req: Request, res: Response, next: NextFunction) => {
       if (req.method !== 'GET' || req.path.startsWith('/api')) return next();
       res.sendFile(path.join(webDist, 'index.html'));

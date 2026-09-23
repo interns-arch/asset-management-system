@@ -100,7 +100,7 @@ export class AssetsService {
   private scope(actor: Actor): SQL | undefined | false {
     if (can(actor, 'asset:view')) return undefined;
     if (!actor.employeeId) return false;
-    return sql`exists (select 1 from allocations al where al.asset_id = ${assets.id} and al.status = 'ACTIVE' and al.employee_id = ${actor.employeeId})`;
+    return sql`exists (select 1 from allocations al where al.asset_id = assets.id and al.status = 'ACTIVE' and al.employee_id = ${actor.employeeId})`;
   }
 
   async assertCanView(actor: Actor, assetId: string) {
@@ -221,15 +221,15 @@ export class AssetsService {
     const holderType = listFilter(q.holderType, HOLDER_TYPES)[0];
     const holderId = uuidParam(q.holderId);
     if (holderType && holderId) {
-      conds.push(sql`exists (select 1 from allocations al where al.asset_id = ${assets.id} and al.status = 'ACTIVE'
+      conds.push(sql`exists (select 1 from allocations al where al.asset_id = assets.id and al.status = 'ACTIVE'
         and al.holder_type = ${holderType}
         and coalesce(al.employee_id, al.department_id, al.location_id, al.company_id, al.vendor_id) = ${holderId})`);
     } else if (holderType) {
-      conds.push(sql`exists (select 1 from allocations al where al.asset_id = ${assets.id} and al.status = 'ACTIVE' and al.holder_type = ${holderType})`);
+      conds.push(sql`exists (select 1 from allocations al where al.asset_id = assets.id and al.status = 'ACTIVE' and al.holder_type = ${holderType})`);
     }
     const employeeId = uuidParam(q.employeeId);
     if (employeeId) {
-      conds.push(sql`exists (select 1 from allocations al where al.asset_id = ${assets.id} and al.status = 'ACTIVE' and al.employee_id = ${employeeId})`);
+      conds.push(sql`exists (select 1 from allocations al where al.asset_id = assets.id and al.status = 'ACTIVE' and al.employee_id = ${employeeId})`);
     }
     if (q.unassigned === '1') conds.push(sql`${assets.holderType} is null`);
 

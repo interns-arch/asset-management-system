@@ -27,11 +27,11 @@ import { LifecycleService } from '../assets/lifecycle.service';
 type ExitCaseRow = typeof exitCases.$inferSelect;
 
 const itemCounts = {
-  total: sql<number>`(select count(*)::int from exit_items i where i.exit_case_id = ${exitCases.id})`,
-  pending: sql<number>`(select count(*)::int from exit_items i where i.exit_case_id = ${exitCases.id} and i.status = 'PENDING')`,
-  returned: sql<number>`(select count(*)::int from exit_items i where i.exit_case_id = ${exitCases.id} and i.status = 'RETURNED')`,
-  damaged: sql<number>`(select count(*)::int from exit_items i where i.exit_case_id = ${exitCases.id} and i.status = 'DAMAGED')`,
-  missing: sql<number>`(select count(*)::int from exit_items i where i.exit_case_id = ${exitCases.id} and i.status = 'MISSING')`,
+  total: sql<number>`(select count(*)::int from exit_items i where i.exit_case_id = exit_cases.id)`,
+  pending: sql<number>`(select count(*)::int from exit_items i where i.exit_case_id = exit_cases.id and i.status = 'PENDING')`,
+  returned: sql<number>`(select count(*)::int from exit_items i where i.exit_case_id = exit_cases.id and i.status = 'RETURNED')`,
+  damaged: sql<number>`(select count(*)::int from exit_items i where i.exit_case_id = exit_cases.id and i.status = 'DAMAGED')`,
+  missing: sql<number>`(select count(*)::int from exit_items i where i.exit_case_id = exit_cases.id and i.status = 'MISSING')`,
 };
 
 /**
@@ -176,7 +176,7 @@ export class ExitService {
     const conds: SQL[] = [];
     const statuses = listFilter(q.status, EXIT_CASE_STATUSES);
     if (statuses.length) conds.push(inArray(exitCases.status, statuses));
-    if (q.pending === '1') conds.push(sql`exists (select 1 from exit_items i where i.exit_case_id = ${exitCases.id} and i.status in ('PENDING', 'MISSING'))`);
+    if (q.pending === '1') conds.push(sql`exists (select 1 from exit_items i where i.exit_case_id = exit_cases.id and i.status in ('PENDING', 'MISSING'))`);
     if (p.search) {
       const like = likePattern(p.search);
       conds.push(or(ilike(employees.fullName, like), ilike(employees.employeeCode, like), ilike(exitCases.caseNumber, like))!);

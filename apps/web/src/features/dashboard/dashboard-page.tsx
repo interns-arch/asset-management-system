@@ -370,8 +370,9 @@ function PersonalView({ data, name }: { data: PersonalDashboard; name?: string }
                       {a.assetTag} · {a.typeName}
                       {a.quantity > 1 ? ` · ×${a.quantity}` : ''}
                     </span>
+                    <AssetStatusBadge status={a.status} className="mt-1 sm:hidden" />
                   </span>
-                  <AssetStatusBadge status={a.status} />
+                  <AssetStatusBadge status={a.status} className="hidden sm:inline-flex" />
                 </Link>
               ))}
             </div>

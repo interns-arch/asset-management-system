@@ -14,7 +14,8 @@ const env = { DATABASE_URL: process.env.DATABASE_URL ?? localUrl('eam'), NODE_EN
 const db = await startPostgres();
 await ensureDatabase('eam');
 await run([path.join(API_DIST, 'db', 'migrate.js')], { env });
-if (process.env.SEED_DEMO !== 'false') await run([path.join(API_DIST, 'seed', 'seed.js')], { env });
+// Empty database: demo data by default, or just roles + first admin with SEED_DEMO=false.
+await run([path.join(API_DIST, 'seed', 'seed.js'), ...(process.env.SEED_DEMO === 'false' ? ['--bootstrap'] : [])], { env });
 
 const api = spawn(process.execPath, [path.join(API_DIST, 'main.js')], { cwd: ROOT, stdio: 'inherit', env: { ...process.env, ...env } });
 console.log(`\n  ➜ Open http://localhost:${env.PORT}\n`);
