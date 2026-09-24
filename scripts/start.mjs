@@ -3,14 +3,16 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { API_DIST, ensureDatabase, localUrl, ROOT, run, startPostgres } from './pg.mjs';
+import { API_DIST, ensureDatabase, localUrl, publicUrl, ROOT, run, startPostgres } from './pg.mjs';
 
 if (!fs.existsSync(path.join(API_DIST, 'main.js')) || !fs.existsSync(path.join(ROOT, 'apps', 'web', 'dist', 'index.html'))) {
   console.error('✖ Build not found. Run `npm run build` first.');
   process.exit(1);
 }
 
-const env = { DATABASE_URL: process.env.DATABASE_URL ?? localUrl('eam'), NODE_ENV: 'production', PORT: process.env.PORT ?? '3000' };
+const PORT = process.env.PORT ?? '3000';
+const PUBLIC_URL = publicUrl(PORT);
+const env = { DATABASE_URL: process.env.DATABASE_URL ?? localUrl('eam'), NODE_ENV: 'production', PORT, ...(PUBLIC_URL ? { PUBLIC_URL } : {}) };
 const db = await startPostgres();
 await ensureDatabase('eam');
 await run([path.join(API_DIST, 'db', 'migrate.js')], { env });
@@ -18,7 +20,7 @@ await run([path.join(API_DIST, 'db', 'migrate.js')], { env });
 await run([path.join(API_DIST, 'seed', 'seed.js'), ...(process.env.SEED_DEMO === 'false' ? ['--bootstrap'] : [])], { env });
 
 const api = spawn(process.execPath, [path.join(API_DIST, 'main.js')], { cwd: ROOT, stdio: 'inherit', env: { ...process.env, ...env } });
-console.log(`\n  ➜ Open http://localhost:${env.PORT}\n`);
+console.log(`\n  ➜ Open http://localhost:${env.PORT}${PUBLIC_URL ? `  ·  phones: ${PUBLIC_URL}` : ''}\n`);
 
 async function shutdown() {
   api.kill();

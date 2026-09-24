@@ -30,10 +30,19 @@ period*. His 7 assets (laptop, charger, SIM, access card, scooty, helmet, keys) 
 checklist and IT is notified. Sign in as **IT** to scan them back; the exit stays blocked until
 every item is cleared or HR records an override with a reason.
 
-**One QR per person.** Every employee's QR holds just their employee ID (e.g. `CT000099`).
-IT prints ID cards (*Employees → select → Print ID cards*) or the employee shows *My QR* on their
-phone. IT taps **Scan**, scans it, and sees the person with everything assigned to them — then
-can assign, return, or tap **Mark checked** (your register's "last checked on").
+**One QR per person.** Every employee's QR is a link built from their employee ID, e.g.
+`http://192.168.1.20:5173/id/CT000099`. Scan it with **any phone camera** or the app's **Scan**
+screen and it opens that person with their details and everything assigned to them (sign in once
+on that phone first). IT can then assign, return, or tap **Mark checked** (your register's
+"last checked on"). Print ID cards from *Employees → select → Print ID cards*, or the employee
+shows *My QR* on their own phone.
+
+**Using it from phones.** `npm run dev` / `npm start` print a phone address such as
+`http://192.168.1.20:5173` — phones on the same Wi-Fi open that, and QR codes use it. When Windows
+asks whether Node.js may use the network, click **Allow** (private networks). Print ID cards after
+starting this way; if the app shows a "can't open on a phone" warning, the QR points to localhost.
+For a real server set `PUBLIC_URL` (e.g. `https://assets.yourcompany.com`); with HTTPS the in-app
+camera also works on phones.
 
 **Logins.** On a person's page IT taps **Give login (view only)**; a password is generated to
 copy or share. The person signs in with their **employee ID** (or email if they have one) and
@@ -122,6 +131,7 @@ DATABASE_URL=postgres://user:pass@host:5432/eam SEED_DEMO=false \
 | --------------- | ----------------------------------------- | --------------------------------------- |
 | `DATABASE_URL`  | bundled local PostgreSQL                  | Any PostgreSQL 16+                      |
 | `PORT`          | `3000`                                    | API + web app port                      |
+| `PUBLIC_URL`    | this PC's Wi-Fi address                   | Address printed into QR codes — set it to the server's real URL |
 | `SEED_DEMO`     | `true`                                    | `false`: no demo data; creates roles + the first admin from `ADMIN_EMAIL` / `ADMIN_PASSWORD` |
 | `COOKIE_SECURE` | `true` in production                      | Set `false` only when not behind HTTPS  |
 | `DB_POOL_SIZE`  | `20`                                      | Connections per API instance            |

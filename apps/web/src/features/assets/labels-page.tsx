@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Printer } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { Barcode, QRCode, qrUrl } from '@/components/common/codes';
+import { Barcode, LocalQrWarning, QRCode, useQrLinks } from '@/components/common/codes';
 import { EmptyState, ErrorState, PageHeader, PageLoader } from '@/components/common/page';
 import { Button } from '@/components/ui/button';
 import { NativeSelect } from '@/components/ui/input';
@@ -15,6 +15,7 @@ export default function LabelsPage() {
   const [params] = useSearchParams();
   const ids = (params.get('ids') ?? '').split(',').filter(Boolean);
   const [size, setSize] = useState<'sm' | 'md'>('md');
+  const links = useQrLinks();
   const q = useQuery({
     queryKey: ['assets', 'labels', ids],
     queryFn: () => api.get<AssetListResponse>('/assets', { ids: ids.join(','), pageSize: 200, sort: 'assetTag', dir: 'asc' }),
@@ -22,7 +23,7 @@ export default function LabelsPage() {
   });
 
   if (!ids.length) return <EmptyState title="No assets selected" description="Select assets in the list and choose “Print labels”." action={<Button asChild variant="outline"><Link to="/assets">Go to assets</Link></Button>} />;
-  if (q.isLoading) return <PageLoader />;
+  if (q.isLoading || !links.ready) return <PageLoader />;
   if (q.error) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
   const items = q.data?.items ?? [];
 
@@ -47,11 +48,12 @@ export default function LabelsPage() {
             </>
           }
         />
+        <LocalQrWarning className="mb-4" />
       </div>
       <div className={cn('grid gap-3', size === 'md' ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-3 sm:grid-cols-4')}>
         {items.map((a) => (
           <div key={a.id} className="flex break-inside-avoid items-center gap-3 rounded-lg border border-zinc-300 bg-white p-3 text-black">
-            <QRCode value={qrUrl(a.qrCode)} size={size === 'md' ? 84 : 64} />
+            <QRCode value={links.asset(a.qrCode)} size={size === 'md' ? 84 : 64} />
             <div className="min-w-0 flex-1">
               <p className="text-[9px] font-semibold uppercase tracking-wider text-zinc-500">Company property · {a.typeName}</p>
               <p className="truncate font-mono text-sm font-bold">{a.assetTag}</p>

@@ -80,6 +80,11 @@ export default function LoginPage() {
         <div className="w-full min-w-0 max-w-sm">
           <h2 className="text-2xl font-semibold tracking-tight">Sign in</h2>
           <p className="mt-1 text-sm text-muted-foreground">Use your employee ID (e.g. CT000099) or work email.</p>
+          {(next.startsWith('/id/') || next.startsWith('/scan/')) && (
+            <p className="mt-4 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+              QR scanned — sign in once and it opens {next.startsWith('/id/') ? `employee ${decodeURIComponent(next.slice(4))}` : 'the asset'}.
+            </p>
+          )}
           <form className="mt-8 grid gap-4" onSubmit={submit} noValidate>
             <Field label="Employee ID or email" error={errorOf(form, 'login')} htmlFor="login">
               <Input

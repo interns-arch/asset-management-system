@@ -1,4 +1,4 @@
-import { Camera, CameraOff, IdCard, Loader2, ScanLine, Search, Tag } from 'lucide-react';
+import { Camera, CameraOff, IdCard, Loader2, ScanLine, Search, Smartphone, Tag } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/primitives';
 import { errorMessage } from '@/lib/api';
 import { resolveCode } from '@/lib/scan';
+import { cn } from '@/lib/utils';
 
 /** Camera-based QR / barcode reader. Returns a stop function. */
 export async function startCameraScanner(video: HTMLVideoElement, onCode: (code: string) => void): Promise<() => void> {
@@ -50,6 +51,20 @@ export function CameraScanner({ onCode, className }: { onCode: (code: string) =>
     setState('idle');
   };
   useEffect(() => () => stop.current?.(), []);
+
+  // Browsers only allow the camera on HTTPS (or localhost). Over plain http on Wi-Fi, the phone's
+  // own camera app still works because every QR is a link.
+  if (!window.isSecureContext) {
+    return (
+      <div className={cn('flex flex-col items-center gap-3 rounded-xl border border-dashed p-6 text-center', className)}>
+        <Smartphone className="size-8 text-primary" />
+        <p className="text-sm font-medium">Scan with your phone’s camera</p>
+        <p className="max-w-xs text-xs text-muted-foreground">
+          Point the normal camera app at an ID card or asset label and tap the link — it opens here. (The in-page camera needs HTTPS.)
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className={className}>

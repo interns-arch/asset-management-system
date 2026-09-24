@@ -25,6 +25,16 @@ export class HealthController {
   }
 }
 
+@Controller('config')
+export class ConfigController {
+  /** Base URL printed into QR codes, so a phone's camera can open them. */
+  @Public()
+  @Get()
+  config() {
+    return { publicUrl: process.env.PUBLIC_URL?.replace(/\/+$/, '') || null };
+  }
+}
+
 @Module({
   imports: [
     CoreModule,
@@ -38,6 +48,6 @@ export class HealthController {
     InsightsModule,
     AdminModule,
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, ConfigController],
 })
 export class AppModule {}

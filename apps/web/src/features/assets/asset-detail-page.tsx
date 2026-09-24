@@ -18,7 +18,7 @@ import {
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { AssetStatusBadge, ConditionBadge, EnumBadge, HolderLabel } from '@/components/common/badges';
-import { Barcode, QRCode, qrUrl } from '@/components/common/codes';
+import { Barcode, QRCode, useQrLinks } from '@/components/common/codes';
 import { AttributeList } from '@/components/common/dynamic-fields';
 import { DetailList, EmptyState, ErrorState, PageLoader } from '@/components/common/page';
 import { Timeline } from '@/components/common/timeline';
@@ -51,6 +51,7 @@ export default function AssetDetailPage() {
   const quickAdd = useQuickAdd();
   const [dialog, setDialog] = useState<AssetDialog | null>(null);
   const [copied, setCopied] = useState(false);
+  const links = useQrLinks();
 
   const q = useQuery({ queryKey: ['asset', id], queryFn: () => api.get<AssetDetail>(`/assets/${id}`), placeholderData: undefined });
   const history = useQuery({ queryKey: ['history', 'asset', id], queryFn: () => api.get<Page<HistoryEvent>>(`/assets/${id}/history`), enabled: !!q.data });
@@ -379,7 +380,7 @@ export default function AssetDetailPage() {
               </Button>
             </CardHeader>
             <CardContent className="flex flex-col items-center gap-3">
-              <QRCode value={qrUrl(a.qrCode)} size={148} className="border p-1.5" />
+              {links.ready && <QRCode value={links.asset(a.qrCode)} size={148} className="border p-1.5" />}
               <Barcode value={a.assetTag} height={34} className="text-foreground dark:invert" />
               <p className="font-mono text-sm font-semibold">{a.assetTag}</p>
               <p className="text-center text-xs text-muted-foreground">Scan with a phone camera or a USB scanner to open this asset.</p>

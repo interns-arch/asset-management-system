@@ -23,7 +23,7 @@ import { type ReactNode, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { toast } from 'sonner';
 import { AssetStatusBadge, EmployeeStatusBadge, EnumBadge } from '@/components/common/badges';
-import { QRCode } from '@/components/common/codes';
+import { LocalQrWarning, QRCode, useQrLinks } from '@/components/common/codes';
 import { useConfirm } from '@/components/common/confirm';
 import { DetailList, EmptyState, ErrorState, PageLoader } from '@/components/common/page';
 import { EntityPicker } from '@/components/common/pickers';
@@ -369,13 +369,14 @@ export default function EmployeeDetailPage() {
 /** The person's own QR: printed on their ID card, or shown on their phone for IT to scan. */
 function IdCardPanel({ employee: e, self }: { employee: EmployeeDetail; self: boolean }) {
   const navigate = useNavigate();
+  const links = useQrLinks();
   const { can } = useAuth();
   return (
     <Card>
       <CardHeader>
         <div>
           <CardTitle>{self ? 'My QR' : 'Person QR'}</CardTitle>
-          <p className="mt-0.5 text-xs text-muted-foreground">{self ? 'Show this to IT to check or return your assets.' : 'One QR per person — it holds their employee ID.'}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{self ? 'Show this to IT to check or return your assets.' : 'Scan with any phone camera or the app to open this page.'}</p>
         </div>
         {can('employee:view') && (
           <Button size="xs" variant="ghost" onClick={() => navigate(`/id-cards?ids=${e.id}`)}>
@@ -384,9 +385,10 @@ function IdCardPanel({ employee: e, self }: { employee: EmployeeDetail; self: bo
         )}
       </CardHeader>
       <CardContent className="flex flex-col items-center gap-2">
-        <QRCode value={e.employeeCode} size={self ? 200 : 164} className="border p-2" />
+        {links.ready && <QRCode value={links.person(e.employeeCode)} size={self ? 200 : 164} className="border p-2" />}
         <p className="font-mono text-sm font-semibold">{e.employeeCode}</p>
         <p className="text-center text-xs text-muted-foreground">{e.fullName}</p>
+        {!self && <LocalQrWarning className="mt-1" />}
       </CardContent>
     </Card>
   );

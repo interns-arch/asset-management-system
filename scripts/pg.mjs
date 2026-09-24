@@ -3,6 +3,7 @@
 import EmbeddedPostgres from 'embedded-postgres';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import pg from 'pg';
 
@@ -73,3 +74,25 @@ export function run(args, { env = {}, cwd = ROOT } = {}) {
 export const TSC = path.join(ROOT, 'node_modules', 'typescript', 'bin', 'tsc');
 export const VITE = path.join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js');
 export const API_DIST = path.join(ROOT, 'apps', 'api', 'dist');
+
+/** This PC's address on the local network (e.g. 192.168.1.20), so phones can open QR links. */
+export function lanAddress() {
+  const candidates = [];
+  for (const [name, addrs] of Object.entries(os.networkInterfaces())) {
+    for (const a of addrs ?? []) {
+      if (a.family !== 'IPv4' || a.internal) continue;
+      // Skip virtual adapters (WSL, Hyper-V, VirtualBox, VPNs) when a real one exists.
+      const virtual = /vethernet|virtual|vmware|vbox|wsl|docker|tailscale|zerotier|hamachi/i.test(name);
+      candidates.push({ address: a.address, score: (virtual ? 0 : 2) + (/^192\.168\.|^10\./.test(a.address) ? 1 : 0) });
+    }
+  }
+  candidates.sort((x, y) => y.score - x.score);
+  return candidates[0]?.address ?? null;
+}
+
+/** Base URL printed into QR codes. PUBLIC_URL wins; otherwise the LAN address. */
+export function publicUrl(port) {
+  if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL.replace(/\/+$/, '');
+  const ip = lanAddress();
+  return ip ? `http://${ip}:${port}` : null;
+}
