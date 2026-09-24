@@ -1,95 +1,219 @@
-import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ArrowRightLeft, Boxes, LogOut, Mail, Pencil, Phone, UserCog, UserPlus, Undo2 } from 'lucide-react';
-import { useState } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import {
+  ArrowLeft,
+  ArrowRightLeft,
+  Boxes,
+  CheckCircle2,
+  ClipboardCheck,
+  Copy,
+  KeyRound,
+  LogOut,
+  Mail,
+  MoreHorizontal,
+  Pencil,
+  Phone,
+  Printer,
+  Share2,
+  ShieldOff,
+  Undo2,
+  UserCog,
+  UserPlus,
+} from 'lucide-react';
+import { type ReactNode, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
+import { toast } from 'sonner';
 import { AssetStatusBadge, EmployeeStatusBadge, EnumBadge } from '@/components/common/badges';
+import { QRCode } from '@/components/common/codes';
+import { useConfirm } from '@/components/common/confirm';
 import { DetailList, EmptyState, ErrorState, PageLoader } from '@/components/common/page';
 import { EntityPicker } from '@/components/common/pickers';
 import { Timeline } from '@/components/common/timeline';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/overlays';
-import { Avatar, Card, CardContent, CardHeader, CardTitle, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/primitives';
-import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/overlays';
+import { Avatar, Badge, Card, CardContent, CardHeader, CardTitle, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/primitives';
 import { AssetActionDialog, type AssetDialog } from '@/features/assets/asset-actions';
 import { useQuickAdd } from '@/features/quick-add/quick-add';
-import { api, type Page } from '@/lib/api';
+import { api, errorMessage, type Page } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { AssetIcon } from '@/lib/icons';
+import { invalidateAssetData, queryClient } from '@/lib/queries';
 import { EXIT_CASE_TONE } from '@/lib/status';
-import type { AssetListItem, EmployeeDetail, HeldAsset, HistoryEvent } from '@/lib/types';
-import { cn, daysUntil, formatDate, relativeTime } from '@/lib/utils';
+import type { Allocation, AssetListItem, EmployeeDetail, HeldAsset, HistoryEvent } from '@/lib/types';
+import { cn, daysUntil, formatDate, formatDateTime, relativeTime } from '@/lib/utils';
 import { StatusDialog } from './status-dialog';
 
 export default function EmployeeDetailPage() {
   const { id } = useParams();
-  const navigate = useNavigate();
-  const { can } = useAuth();
+  const { can, me } = useAuth();
   const quickAdd = useQuickAdd();
+  const confirm = useConfirm();
   const [statusOpen, setStatusOpen] = useState(false);
   const [dialog, setDialog] = useState<AssetDialog | null>(null);
   const [pickAsset, setPickAsset] = useState(false);
+  const [credentials, setCredentials] = useState<Credentials | null>(null);
   const q = useQuery({ queryKey: ['employee', id], queryFn: () => api.get<EmployeeDetail>(`/employees/${id}`), placeholderData: undefined });
   const history = useQuery({ queryKey: ['history', 'employee', id], queryFn: () => api.get<Page<HistoryEvent>>(`/employees/${id}/history`), enabled: !!q.data });
+
+  const refresh = () =>
+    Promise.all([queryClient.invalidateQueries({ queryKey: ['employee', id] }), queryClient.invalidateQueries({ queryKey: ['history', 'employee', id] })]);
+  const verify = useMutation({
+    mutationFn: () => api.post(`/employees/${id}/verify-assets`, {}),
+    onSuccess: async () => {
+      await refresh();
+      toast.success('Marked as checked today');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+  const access = useMutation({
+    mutationFn: () => api.post<Credentials>(`/employees/${id}/access`, {}),
+    onSuccess: async (r) => {
+      await Promise.all([refresh(), queryClient.invalidateQueries({ queryKey: ['users'] })]);
+      setCredentials(r);
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
+  const disable = useMutation({
+    mutationFn: (userId: string) => api.patch(`/users/${userId}`, { isActive: false }),
+    onSuccess: async () => {
+      await refresh();
+      toast.success('Login turned off');
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
 
   if (q.isLoading) return <PageLoader />;
   if (q.error || !q.data) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
   const e = q.data;
+  const self = me?.employee?.id === e.id;
   const exited = e.status === 'EXITED';
   const lwd = daysUntil(e.lastWorkingDate);
+  const canAssign = can('asset:assign');
   const assetOf = (h: HeldAsset) => ({ id: h.assetId, assetTag: h.assetTag, name: h.name, trackingMode: h.trackingMode, holderType: 'EMPLOYEE' as const, holderName: e.fullName });
-  const fakeAllocation = (h: HeldAsset) =>
-    ({ id: h.allocationId, holderName: e.fullName, quantity: h.quantity, holderType: 'EMPLOYEE' }) as unknown as NonNullable<Extract<AssetDialog, { kind: 'return' }>['allocation']>;
+  const allocationOf = (h: HeldAsset) => ({ id: h.allocationId, holderName: e.fullName, quantity: h.quantity, holderType: 'EMPLOYEE' }) as unknown as Allocation;
+
+  const idCard = <IdCardPanel employee={e} self={self} />;
+  const contact = <ContactPanel employee={e} />;
+  const login = (can('user:manage') || e.login) && !self && (
+    <LoginPanel
+      employee={e}
+      busy={access.isPending || disable.isPending}
+      onGrant={async () => {
+        if (e.login?.isActive) {
+          const r = await confirm({ title: `Reset ${e.fullName}’s password?`, description: 'A new password is generated and they are signed out everywhere.', confirmText: 'Reset password' });
+          if (!r.confirmed) return;
+        }
+        access.mutate();
+      }}
+      onDisable={async () => {
+        const r = await confirm({ title: `Turn off ${e.fullName}’s login?`, description: 'They will be signed out and can’t sign in until you give access again.', confirmText: 'Turn off', destructive: true });
+        if (r.confirmed && e.login) disable.mutate(e.login.id);
+      }}
+    />
+  );
+  const profile = (
+    <Card>
+      <CardHeader>
+        <CardTitle>Profile</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <DetailList
+          columns={1}
+          items={[
+            { label: 'Company', value: e.companyName },
+            { label: 'Department', value: e.departmentName },
+            { label: 'Location / branch', value: e.locationName },
+            { label: 'Reports to', value: e.managerName },
+            { label: 'Joined', value: e.joinDate && formatDate(e.joinDate) },
+            ...(e.noticeDate ? [{ label: 'Notice given', value: formatDate(e.noticeDate) }] : []),
+            ...(e.lastWorkingDate ? [{ label: 'Last working day', value: <span className={cn(lwd !== null && lwd <= 3 && 'font-medium text-amber-600')}>{formatDate(e.lastWorkingDate)}</span> }] : []),
+            ...(e.exitDate ? [{ label: 'Exited on', value: formatDate(e.exitDate) }] : []),
+            ...(e.notes ? [{ label: 'Notes', value: e.notes }] : []),
+          ]}
+        />
+        {e.directReports.length > 0 && (
+          <div className="mt-4 border-t pt-3">
+            <p className="mb-2 text-xs text-muted-foreground">Direct reports</p>
+            <ul className="space-y-2">
+              {e.directReports.map((r) => (
+                <li key={r.id}>
+                  <Link to={`/employees/${r.id}`} className="flex items-center gap-2 text-sm hover:text-primary">
+                    <Avatar name={r.fullName} className="size-6" />
+                    <span className="flex-1 truncate">{r.fullName}</span>
+                    <span className="truncate text-xs text-muted-foreground">{r.designation}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 
   return (
-    <div className="space-y-5">
-      <div>
-        <Link to="/employees" className="mb-3 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+    <div className="space-y-4 sm:space-y-5">
+      {can('employee:view') && (
+        <Link to="/employees" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-3.5" /> Employees
         </Link>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex items-start gap-4">
-            <Avatar name={e.fullName} className="size-14 text-base" />
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{e.fullName}</h1>
-              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground">{e.employeeCode}</span>
-                <EmployeeStatusBadge status={e.status} />
-                {e.designation && <span>{e.designation}</span>}
-                {e.departmentName && <span>· {e.departmentName}</span>}
-              </div>
-              <div className="mt-2 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                {e.email && (
-                  <a href={`mailto:${e.email}`} className="inline-flex items-center gap-1 hover:text-foreground">
-                    <Mail className="size-3.5" /> {e.email}
-                  </a>
-                )}
-                {e.phone && (
-                  <span className="inline-flex items-center gap-1">
-                    <Phone className="size-3.5" /> {e.phone}
-                  </span>
-                )}
-              </div>
+      )}
+
+      {/* Who */}
+      <Card className="p-4 sm:p-5">
+        <div className="flex items-start gap-3 sm:gap-4">
+          <Avatar name={e.fullName} className="size-14 text-base sm:size-16 sm:text-lg" />
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl leading-tight font-semibold tracking-tight sm:text-2xl">{e.fullName}</h1>
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{e.employeeCode}</span>
+              <EmployeeStatusBadge status={e.status} />
             </div>
+            <p className="mt-1.5 text-sm text-muted-foreground">{[e.designation, e.departmentName, e.locationName].filter(Boolean).join(' · ') || '—'}</p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {can('asset:assign') && !exited && (
-              <Button size="sm" onClick={() => setPickAsset(true)}>
-                <UserPlus /> Assign asset
-              </Button>
-            )}
-            {can('employee:status') && (
-              <Button size="sm" variant="outline" onClick={() => setStatusOpen(true)}>
-                <UserCog /> Change status
-              </Button>
-            )}
-            {can('employee:manage') && (
-              <Button size="sm" variant="outline" onClick={() => quickAdd.open('employee', { record: e })}>
-                <Pencil /> Edit
-              </Button>
-            )}
-          </div>
+          {(can('employee:status') || can('employee:manage')) && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="icon-sm" variant="ghost" aria-label="More actions">
+                  <MoreHorizontal />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {can('employee:manage') && (
+                  <DropdownMenuItem onSelect={() => quickAdd.open('employee', { record: e })}>
+                    <Pencil /> Edit details
+                  </DropdownMenuItem>
+                )}
+                {can('employee:status') && (
+                  <DropdownMenuItem onSelect={() => setStatusOpen(true)}>
+                    <UserCog /> Change status / notice period
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
-      </div>
+        {canAssign && !exited && (
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:flex">
+            <Button onClick={() => setPickAsset(true)} className="h-11 sm:h-9">
+              <UserPlus /> Assign asset
+            </Button>
+            <Button variant="outline" onClick={() => verify.mutate()} loading={verify.isPending} className="h-11 sm:h-9">
+              <ClipboardCheck /> Mark checked
+            </Button>
+          </div>
+        )}
+      </Card>
 
       {e.openExitCase && (
         <Link
@@ -98,78 +222,88 @@ export default function EmployeeDetailPage() {
         >
           <LogOut className="size-4 shrink-0" />
           <span className="flex-1">
-            On notice — last working day <span className="font-semibold">{formatDate(e.openExitCase.lastWorkingDate)}</span>
-            {lwd !== null && <> ({lwd < 0 ? `${-lwd} days overdue` : lwd === 0 ? 'today' : `${lwd} days left`})</>}. {e.assets.length} asset(s) still with them.
+            On notice — last day <span className="font-semibold">{formatDate(e.openExitCase.lastWorkingDate)}</span>
+            {lwd !== null && <> ({lwd < 0 ? `${-lwd} days overdue` : lwd === 0 ? 'today' : `${lwd} days left`})</>}. Return checklist {e.openExitCase.caseNumber} →
           </span>
-          <span className="text-xs font-medium">Recovery checklist {e.openExitCase.caseNumber} →</span>
         </Link>
       )}
 
-      <div className="grid gap-5 lg:grid-cols-3">
-        <div className="space-y-5 lg:col-span-2">
+      <div className="grid gap-4 sm:gap-5 lg:grid-cols-3">
+        <div className="space-y-4 sm:space-y-5 lg:col-span-2">
+          {/* Their own QR comes first for the person themselves; IT sees the assets first. */}
+          {self && <div className="lg:hidden">{idCard}</div>}
+          {/* What they hold */}
           <Card>
-            <CardHeader>
+            <CardHeader className="flex-wrap">
               <div>
-                <CardTitle>Assets held</CardTitle>
-                <p className="text-xs text-muted-foreground">{e.assets.length} item(s) currently assigned</p>
+                <CardTitle className="text-base">{self ? 'My assets' : 'Assets held'} ({e.assets.length})</CardTitle>
+                <p className={cn('mt-0.5 flex items-center gap-1 text-xs', e.assetsVerifiedAt ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground')}>
+                  {e.assetsVerifiedAt ? (
+                    <>
+                      <CheckCircle2 className="size-3.5" />
+                      <span title={formatDateTime(e.assetsVerifiedAt)}>
+                        Last checked {formatDate(e.assetsVerifiedAt)} ({relativeTime(e.assetsVerifiedAt)}){e.assetsVerifiedByName ? ` by ${e.assetsVerifiedByName}` : ''}
+                      </span>
+                    </>
+                  ) : (
+                    'Never checked in person'
+                  )}
+                </p>
               </div>
               {e.assets.length > 0 && can('asset:view') && (
-                <Button size="xs" variant="ghost" onClick={() => navigate(`/assets?employeeId=${e.id}`)}>
-                  <Boxes /> Open in assets
+                <Button size="xs" variant="ghost" asChild>
+                  <Link to={`/assets?employeeId=${e.id}`}>
+                    <Boxes /> Open in assets
+                  </Link>
                 </Button>
               )}
             </CardHeader>
-            {e.assets.length === 0 ? (
-              <EmptyState icon={Boxes} title="No assets assigned" className="py-8" />
-            ) : (
-              <Table>
-                <THead>
-                  <TR>
-                    <TH>Asset</TH>
-                    <TH className="hidden md:table-cell">Type</TH>
-                    <TH>Status</TH>
-                    <TH className="hidden md:table-cell">Since</TH>
-                    {can('asset:assign') && <TH className="w-20" />}
-                  </TR>
-                </THead>
-                <TBody>
+            <CardContent>
+              {e.assets.length === 0 ? (
+                <EmptyState icon={Boxes} title={self ? 'Nothing is assigned to you' : 'No assets assigned'} className="py-8" />
+              ) : (
+                <ul className="grid gap-2 2xl:grid-cols-2">
                   {e.assets.map((h) => (
-                    <TR key={h.allocationId} className="cursor-pointer hover:bg-muted/50" onClick={() => navigate(`/assets/${h.assetId}`)}>
-                      <TD>
-                        <div className="flex items-center gap-3">
-                          <AssetIcon icon={h.typeIcon ?? h.categoryIcon} color={h.categoryColor} size="sm" />
-                          <div className="min-w-0">
-                            <div className="truncate font-medium">
-                              {h.name}
-                              {h.quantity > 1 && <span className="ml-1 text-xs text-muted-foreground">×{h.quantity}</span>}
-                            </div>
-                            <div className="truncate font-mono text-xs text-muted-foreground">{h.assetTag}</div>
-                          </div>
+                    <li key={h.allocationId} className="rounded-xl border transition hover:border-primary/40">
+                      <Link to={`/assets/${h.assetId}`} className="flex items-center gap-3 p-3">
+                        <AssetIcon icon={h.typeIcon ?? h.categoryIcon} color={h.categoryColor} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">
+                            {h.name}
+                            {h.quantity > 1 && <span className="ml-1 text-muted-foreground">×{h.quantity}</span>}
+                          </span>
+                          <span className="block truncate text-xs text-muted-foreground">
+                            <span className="font-mono">{h.assetTag}</span> · {h.typeName}
+                          </span>
+                          {h.serialNumber && <span className="block truncate font-mono text-[11px] text-muted-foreground">SN {h.serialNumber}</span>}
+                        </span>
+                        <AssetStatusBadge status={h.status} className="self-start" />
+                      </Link>
+                      {canAssign && (
+                        <div className="flex items-center justify-between gap-2 border-t px-3 py-1.5 text-xs text-muted-foreground">
+                          <span className="whitespace-nowrap">Since {formatDate(h.assignedAt)}</span>
+                          <span className="flex gap-1">
+                            <Button size="xs" variant="ghost" onClick={() => setDialog({ kind: 'transfer', asset: assetOf(h), allocation: allocationOf(h) })}>
+                              <ArrowRightLeft /> Transfer
+                            </Button>
+                            <Button size="xs" variant="ghost" onClick={() => setDialog({ kind: 'return', asset: assetOf(h), allocation: allocationOf(h) })}>
+                              <Undo2 /> Return
+                            </Button>
+                          </span>
                         </div>
-                      </TD>
-                      <TD className="hidden text-muted-foreground md:table-cell">{h.typeName}</TD>
-                      <TD>
-                        <AssetStatusBadge status={h.status} />
-                      </TD>
-                      <TD className="hidden whitespace-nowrap text-muted-foreground md:table-cell">{relativeTime(h.assignedAt)}</TD>
-                      {can('asset:assign') && (
-                        <TD onClick={(ev) => ev.stopPropagation()}>
-                          <div className="flex justify-end gap-0.5">
-                            <Button size="icon-xs" variant="ghost" title="Transfer" onClick={() => setDialog({ kind: 'transfer', asset: assetOf(h), allocation: fakeAllocation(h) })}>
-                              <ArrowRightLeft />
-                            </Button>
-                            <Button size="icon-xs" variant="ghost" title="Return" onClick={() => setDialog({ kind: 'return', asset: assetOf(h), allocation: fakeAllocation(h) })}>
-                              <Undo2 />
-                            </Button>
-                          </div>
-                        </TD>
                       )}
-                    </TR>
+                    </li>
                   ))}
-                </TBody>
-              </Table>
-            )}
+                </ul>
+              )}
+            </CardContent>
           </Card>
+
+          <div className="space-y-4 lg:hidden">
+            {!self && idCard}
+            {contact}
+            {login}
+          </div>
 
           <Card>
             <Tabs defaultValue="history">
@@ -201,75 +335,20 @@ export default function EmployeeDetailPage() {
               </TabsContent>
             </Tabs>
           </Card>
+
+          <div className="lg:hidden">{profile}</div>
         </div>
 
-        <div className="space-y-5">
-          <Card>
-            <CardHeader>
-              <CardTitle>Profile</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <DetailList
-                columns={1}
-                items={[
-                  { label: 'Company', value: e.companyName },
-                  { label: 'Department', value: e.departmentName },
-                  { label: 'Location', value: e.locationName },
-                  { label: 'Reports to', value: e.managerName },
-                  { label: 'Joined', value: e.joinDate && formatDate(e.joinDate) },
-                  ...(e.noticeDate ? [{ label: 'Notice given', value: formatDate(e.noticeDate) }] : []),
-                  ...(e.lastWorkingDate ? [{ label: 'Last working day', value: <span className={cn(lwd !== null && lwd <= 3 && 'font-medium text-amber-600')}>{formatDate(e.lastWorkingDate)}</span> }] : []),
-                  ...(e.exitDate ? [{ label: 'Exited on', value: formatDate(e.exitDate) }] : []),
-                  ...(e.notes ? [{ label: 'Notes', value: e.notes }] : []),
-                ]}
-              />
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Portal login</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {e.login ? (
-                <DetailList
-                  columns={1}
-                  items={[
-                    { label: 'Email', value: e.login.email },
-                    { label: 'Role', value: e.login.roleName },
-                    { label: 'Access', value: e.login.isActive ? 'Active' : 'Disabled' },
-                    { label: 'Last sign-in', value: e.login.lastLoginAt ? relativeTime(e.login.lastLoginAt) : 'Never' },
-                  ]}
-                />
-              ) : (
-                <p className="text-sm text-muted-foreground">No login. {can('user:manage') && <Link to="/settings/users" className="text-primary hover:underline">Create one</Link>}</p>
-              )}
-            </CardContent>
-          </Card>
-          {e.directReports.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Direct reports</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  {e.directReports.map((r) => (
-                    <li key={r.id}>
-                      <Link to={`/employees/${r.id}`} className="flex items-center gap-2 text-sm hover:text-primary">
-                        <Avatar name={r.fullName} className="size-6" />
-                        <span className="flex-1 truncate">{r.fullName}</span>
-                        <span className="truncate text-xs text-muted-foreground">{r.designation}</span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          )}
+        <div className="hidden space-y-5 lg:block">
+          {idCard}
+          {contact}
+          {login}
+          {profile}
         </div>
       </div>
 
       {statusOpen && <StatusDialog employee={e} open={statusOpen} onOpenChange={setStatusOpen} />}
-      <AssetActionDialog dialog={dialog} onClose={() => setDialog(null)} />
+      <AssetActionDialog dialog={dialog} onClose={() => setDialog(null)} onDone={() => void invalidateAssetData()} />
       <PickAssetDialog
         open={pickAsset}
         onOpenChange={setPickAsset}
@@ -282,7 +361,181 @@ export default function EmployeeDetailPage() {
           });
         }}
       />
+      <CredentialsDialog employee={e} credentials={credentials} onClose={() => setCredentials(null)} />
     </div>
+  );
+}
+
+/** The person's own QR: printed on their ID card, or shown on their phone for IT to scan. */
+function IdCardPanel({ employee: e, self }: { employee: EmployeeDetail; self: boolean }) {
+  const navigate = useNavigate();
+  const { can } = useAuth();
+  return (
+    <Card>
+      <CardHeader>
+        <div>
+          <CardTitle>{self ? 'My QR' : 'Person QR'}</CardTitle>
+          <p className="mt-0.5 text-xs text-muted-foreground">{self ? 'Show this to IT to check or return your assets.' : 'One QR per person — it holds their employee ID.'}</p>
+        </div>
+        {can('employee:view') && (
+          <Button size="xs" variant="ghost" onClick={() => navigate(`/id-cards?ids=${e.id}`)}>
+            <Printer /> ID card
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent className="flex flex-col items-center gap-2">
+        <QRCode value={e.employeeCode} size={self ? 200 : 164} className="border p-2" />
+        <p className="font-mono text-sm font-semibold">{e.employeeCode}</p>
+        <p className="text-center text-xs text-muted-foreground">{e.fullName}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ContactRow({ icon, label, value, href }: { icon: ReactNode; label: string; value: string; href: string }) {
+  return (
+    <a href={href} className="flex min-h-12 items-center gap-3 rounded-lg px-2 py-2 transition hover:bg-muted active:bg-muted">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary [&_svg]:size-4">{icon}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-xs text-muted-foreground">{label}</span>
+        <span className="block truncate text-sm font-medium">{value}</span>
+      </span>
+    </a>
+  );
+}
+
+function ContactPanel({ employee: e }: { employee: EmployeeDetail }) {
+  const rows = [
+    e.phone && { icon: <Phone />, label: 'Official phone', value: e.phone, href: `tel:${e.phone.replace(/\s/g, '')}` },
+    e.personalPhone && { icon: <Phone />, label: 'Personal phone', value: e.personalPhone, href: `tel:${e.personalPhone.replace(/\s/g, '')}` },
+    e.email && { icon: <Mail />, label: 'Official email', value: e.email, href: `mailto:${e.email}` },
+    e.personalEmail && { icon: <Mail />, label: 'Personal email', value: e.personalEmail, href: `mailto:${e.personalEmail}` },
+  ].filter(Boolean) as { icon: ReactNode; label: string; value: string; href: string }[];
+  return (
+    <Card>
+      <CardHeader className="pb-1">
+        <CardTitle>Contact</CardTitle>
+      </CardHeader>
+      <CardContent className="px-3">
+        {rows.length ? (
+          <div className="divide-y">
+            {rows.map((r) => (
+              <ContactRow key={r.label} {...r} />
+            ))}
+          </div>
+        ) : (
+          <p className="px-2 text-sm text-muted-foreground">No phone or email recorded.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function LoginPanel({ employee: e, busy, onGrant, onDisable }: { employee: EmployeeDetail; busy: boolean; onGrant: () => void; onDisable: () => void }) {
+  const { can } = useAuth();
+  const manage = can('user:manage');
+  const active = !!e.login?.isActive;
+  return (
+    <Card>
+      <CardHeader>
+        <div>
+          <CardTitle>Portal login</CardTitle>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {active ? (
+              <>
+                Signs in with <span className="font-mono font-medium text-foreground">{e.employeeCode}</span>
+                {e.login?.email ? <> or {e.login.email}</> : null}
+              </>
+            ) : e.login ? (
+              'Login is turned off'
+            ) : (
+              'No login yet'
+            )}
+          </p>
+        </div>
+        {e.login && <Badge tone={active ? 'green' : 'neutral'} dot>{active ? e.login.roleName : 'Off'}</Badge>}
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {e.login && (
+          <p className="text-xs text-muted-foreground">Last sign-in: {e.login.lastLoginAt ? relativeTime(e.login.lastLoginAt) : 'never'}</p>
+        )}
+        {manage && e.status !== 'EXITED' && (
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+            <Button variant={active ? 'outline' : 'default'} onClick={onGrant} loading={busy} className="h-11 sm:h-9">
+              <KeyRound /> {active ? 'Reset password' : e.login ? 'Turn login back on' : 'Give login (view only)'}
+            </Button>
+            {active && (
+              <Button variant="ghost" onClick={onDisable} disabled={busy} className="h-11 sm:h-9">
+                <ShieldOff /> Turn off
+              </Button>
+            )}
+          </div>
+        )}
+        {!e.login && manage && <p className="text-xs text-muted-foreground">They’ll only see their own assets and QR. A password is generated for you to share.</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
+interface Credentials {
+  loginId: string;
+  email: string | null;
+  password: string;
+  created: boolean;
+}
+
+/** Shown once after giving a login: IT copies or shares it (e.g. on WhatsApp). */
+function CredentialsDialog({ employee, credentials, onClose }: { employee: EmployeeDetail; credentials: Credentials | null; onClose: () => void }) {
+  const text = credentials
+    ? `Asset Portal login for ${employee.fullName}\n${window.location.origin}\nEmployee ID: ${credentials.loginId}\nPassword: ${credentials.password}\nPlease change your password after signing in.`
+    : '';
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('Copied');
+    } catch {
+      toast.error('Couldn’t copy — select the text instead');
+    }
+  };
+  return (
+    <Dialog open={!!credentials} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>{credentials?.created ? 'Login created' : 'New password'}</DialogTitle>
+          <DialogDescription>Share this with {employee.fullName}. The password is shown only now.</DialogDescription>
+        </DialogHeader>
+        {credentials && (
+          <div className="space-y-2 rounded-lg border bg-muted/40 p-3 text-sm">
+            <div className="flex justify-between gap-3">
+              <span className="text-muted-foreground">Employee ID</span>
+              <span className="font-mono font-semibold">{credentials.loginId}</span>
+            </div>
+            {credentials.email && (
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">or email</span>
+                <span className="truncate">{credentials.email}</span>
+              </div>
+            )}
+            <div className="flex justify-between gap-3">
+              <span className="text-muted-foreground">Password</span>
+              <span className="font-mono text-base font-semibold select-all">{credentials.password}</span>
+            </div>
+          </div>
+        )}
+        <DialogFooter className="grid grid-cols-2 gap-2 sm:flex">
+          {typeof navigator.share === 'function' ? (
+            <Button variant="outline" onClick={() => void navigator.share({ text }).catch(() => {})}>
+              <Share2 /> Share
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={copy}>
+              <Copy /> Copy
+            </Button>
+          )}
+          <Button onClick={onClose}>Done</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -297,11 +550,13 @@ function PickAssetDialog({ open, onOpenChange, onPick }: { open: boolean; onOpen
           <DialogTitle>Assign an asset</DialogTitle>
           <DialogDescription>Choose an available asset (or one in a store).</DialogDescription>
         </DialogHeader>
-        <PickerWithRow
+        <EntityPicker
+          kind="asset"
           value={value}
-          onChange={(v, row) => {
+          assetFilter={{ status: 'AVAILABLE,IN_INVENTORY' }}
+          onChange={async (v) => {
             setValue(v);
-            setPicked(row);
+            setPicked(v ? await api.get<AssetListItem>(`/assets/${v}`) : null);
           }}
         />
         <DialogFooter>
@@ -314,20 +569,5 @@ function PickAssetDialog({ open, onOpenChange, onPick }: { open: boolean; onOpen
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function PickerWithRow({ value, onChange }: { value: string | null; onChange: (v: string | null, row: AssetListItem | null) => void }) {
-  return (
-    <EntityPicker
-      kind="asset"
-      value={value}
-      assetFilter={{ status: 'AVAILABLE,IN_INVENTORY' }}
-      onChange={async (v) => {
-        if (!v) return onChange(null, null);
-        const row = await api.get<AssetListItem & { type: { trackingMode: 'INDIVIDUAL' | 'QUANTITY' } }>(`/assets/${v}`);
-        onChange(v, row);
-      }}
-    />
   );
 }

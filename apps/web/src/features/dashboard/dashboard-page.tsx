@@ -1,6 +1,6 @@
 import { ASSET_STATUS_LABELS, ASSET_STATUSES, type AssetStatus, HOLDER_TYPE_LABELS, type HolderType } from '@eam/shared';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, ArrowRight, Boxes, CheckCircle2, ClipboardList, LifeBuoy, LogOut, PackageCheck, Plus, ScanLine, ShieldAlert, UserPlus, Wrench } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Boxes, CheckCircle2, ClipboardList, LifeBuoy, LogOut, PackageCheck, Plus, QrCode, ScanLine, ShieldAlert, UserPlus, Wrench } from 'lucide-react';
 import { Link, useNavigate } from 'react-router';
 import { AssetStatusBadge, EnumBadge, HOLDER_ICONS } from '@/components/common/badges';
 import { EmptyState, ErrorState, PageHeader, PageLoader, StatCard } from '@/components/common/page';
@@ -324,11 +324,12 @@ function OrgView({ data, name }: { data: OrgDashboard; name?: string }) {
 
 function PersonalView({ data, name }: { data: PersonalDashboard; name?: string }) {
   const quickAdd = useQuickAdd();
+  const { me } = useAuth();
   return (
     <div className="space-y-5">
       <PageHeader
         title={`${greeting()}${name ? `, ${name}` : ''}`}
-        description="Your assets, requests and tickets."
+        description="Everything assigned to you. View only - ask IT for any change."
         actions={
           <>
             <Button size="sm" onClick={() => quickAdd.open('request')}>
@@ -340,6 +341,18 @@ function PersonalView({ data, name }: { data: PersonalDashboard; name?: string }
           </>
         }
       />
+      {me?.employee && (
+        <Link to={`/employees/${me.employee.id}`} className="flex items-center gap-3 rounded-xl border bg-card p-4 transition hover:border-primary/40 active:bg-muted">
+          <span className="flex size-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <QrCode className="size-6" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-medium">My QR · {me.employee.employeeCode}</span>
+            <span className="block text-xs text-muted-foreground">Show it to IT to check or return your assets</span>
+          </span>
+          <ArrowRight className="size-4 text-muted-foreground" />
+        </Link>
+      )}
       {data.openExit && (
         <Link to={`/exits/${data.openExit.id}`} className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
           <LogOut className="size-5" />

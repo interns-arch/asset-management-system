@@ -21,7 +21,7 @@ import type {
 } from '@eam/shared';
 
 export interface Me {
-  user: { id: string; name: string; email: string };
+  user: { id: string; name: string; email: string | null };
   role: { id: string; name: string };
   permissions: Permission[];
   employee: { id: string; fullName: string; employeeCode: string; status: EmployeeStatus; designation: string | null } | null;
@@ -211,6 +211,7 @@ export interface Employee {
   lastName: string | null;
   email: string | null;
   phone: string | null;
+  personalPhone: string | null;
   designation: string | null;
   status: EmployeeStatus;
   joinDate: string | null;
@@ -250,9 +251,12 @@ export interface EmployeeDetail extends Omit<Employee, 'assetCount' | 'openExitC
   noticeDate: string | null;
   exitDate: string | null;
   notes: string | null;
+  personalEmail: string | null;
+  assetsVerifiedAt: string | null;
+  assetsVerifiedByName: string | null;
   createdAt: string;
   assets: HeldAsset[];
-  login: { id: string; email: string; isActive: boolean; roleName: string; lastLoginAt: string | null } | null;
+  login: { id: string; email: string | null; isActive: boolean; roleName: string; lastLoginAt: string | null } | null;
   openExitCase: { id: string; caseNumber: string; lastWorkingDate: string } | null;
   exitCases: { id: string; caseNumber: string; status: ExitCaseStatus; lastWorkingDate: string }[];
   directReports: { id: string; fullName: string; designation: string | null }[];
@@ -412,7 +416,7 @@ export interface Notification {
 export interface UserRow {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
   roleId: string;
   roleName: string;
   employeeId: string | null;

@@ -116,19 +116,17 @@ describe('security', () => {
 });
 
 describe('one QR per person and view-only logins', () => {
-  test('every employee gets a unique QR that resolves to the person', async () => {
-    const a = await call('GET', `/employees/${ids.alice}`);
-    const b = await call('GET', `/employees/${ids.bob}`);
-    assert.match(a.body.qrCode, /^[a-z0-9]{12}$/);
-    assert.notEqual(a.body.qrCode, b.body.qrCode);
-    for (const code of [a.body.qrCode, `https://assets.example.com/id/${a.body.qrCode}`, 't001']) {
+  test('a person QR holds their employee ID and resolves to the person', async () => {
+    for (const code of ['T001', 't001', 'https://assets.example.com/id/T001']) {
       const r = await call('GET', `/employees/lookup?code=${encodeURIComponent(code)}`);
       assert.equal(r.status, 200, code);
       assert.equal(r.body.id, ids.alice);
     }
+    // Employee IDs are unique regardless of case, so a QR can never match two people.
+    assert.equal((await call('POST', '/employees', { employeeCode: 't001', firstName: 'Dup' })).status, 409);
     // An employee can resolve their own QR but not someone else's.
-    assert.equal((await call('GET', `/employees/lookup?code=${b.body.qrCode}`, undefined, 'bob')).status, 200);
-    assert.equal((await call('GET', `/employees/lookup?code=${a.body.qrCode}`, undefined, 'bob')).status, 404);
+    assert.equal((await call('GET', '/employees/lookup?code=T002', undefined, 'bob')).status, 200);
+    assert.equal((await call('GET', '/employees/lookup?code=T001', undefined, 'bob')).status, 404);
   });
 
   test('IT gives an employee a login; they sign in with their employee ID and can only view', async () => {

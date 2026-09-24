@@ -36,7 +36,7 @@ export const MAIN_NAV: NavItem[] = [
   { label: 'Tickets', to: '/tickets', icon: LifeBuoy, perms: ['ticket:create', 'ticket:manage'], shortcut: 'G T' },
   { label: 'Maintenance', to: '/maintenance', icon: Wrench, perms: ['maintenance:manage', 'asset:view'], shortcut: 'G M' },
   { label: 'Activity log', to: '/activity', icon: Activity, perms: ['history:view'] },
-  { label: 'Scan', to: '/scan', icon: ScanLine, shortcut: 'G S' },
+  { label: 'Scan', to: '/scan', icon: ScanLine, perms: ['asset:view', 'employee:view'], shortcut: 'G S' },
 ];
 
 export const SETTINGS_NAV: NavItem[] = [

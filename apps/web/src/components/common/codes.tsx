@@ -8,6 +8,7 @@ export function qrUrl(qrCode: string): string {
   return `${window.location.origin}/scan/${qrCode}`;
 }
 
+
 export function QRCode({ value, size = 128, className }: { value: string; size?: number; className?: string }) {
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {

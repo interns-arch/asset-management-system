@@ -14,7 +14,8 @@ const DEMO = [
   { email: 'it@acme.test', role: 'IT / Asset manager' },
   { email: 'hr@acme.test', role: 'HR' },
   { email: 'manager@acme.test', role: 'Manager' },
-  { email: 'rahul@acme.test', role: 'Employee' },
+  { email: 'rahul@acme.test', role: 'Employee (view only)' },
+  { email: 'ACM1099', role: 'Employee ID, no email' },
 ];
 
 export default function LoginPage() {
@@ -23,7 +24,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
-  const form = useZodForm(loginSchema, { email: '', password: '' });
+  const form = useZodForm(loginSchema, { login: '', password: '' });
   const next = params.get('next') || '/';
 
   if (me) return <Navigate to={next} replace />;
@@ -78,13 +79,23 @@ export default function LoginPage() {
       <div className="flex min-w-0 items-center justify-center p-6 sm:p-10">
         <div className="w-full min-w-0 max-w-sm">
           <h2 className="text-2xl font-semibold tracking-tight">Sign in</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Welcome back. Use your work account.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Use your employee ID (e.g. CT000099) or work email.</p>
           <form className="mt-8 grid gap-4" onSubmit={submit} noValidate>
-            <Field label="Email" error={errorOf(form, 'email')} htmlFor="email">
-              <Input id="email" type="email" autoComplete="username" autoFocus placeholder="you@company.com" {...form.register('email')} />
+            <Field label="Employee ID or email" error={errorOf(form, 'login')} htmlFor="login">
+              <Input
+                id="login"
+                autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                autoFocus
+                placeholder="CT000099 or you@company.com"
+                className="h-11 text-base sm:h-9 sm:text-sm"
+                {...form.register('login')}
+              />
             </Field>
             <Field label="Password" error={errorOf(form, 'password')} htmlFor="password">
-              <Input id="password" type="password" autoComplete="current-password" {...form.register('password')} />
+              <Input id="password" type="password" autoComplete="current-password" className="h-11 text-base sm:h-9 sm:text-sm" {...form.register('password')} />
             </Field>
             {error && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">{error}</p>}
             <Button type="submit" size="lg" loading={form.formState.isSubmitting}>
@@ -102,7 +113,7 @@ export default function LoginPage() {
                     type="button"
                     className="flex cursor-pointer items-center justify-between rounded-md border bg-card px-3 py-2 text-left text-sm transition hover:border-primary/40"
                     onClick={() => {
-                      form.setValue('email', d.email);
+                      form.setValue('login', d.email);
                       form.setValue('password', 'Demo@1234');
                       void submit();
                     }}

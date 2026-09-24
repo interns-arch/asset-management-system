@@ -1,6 +1,7 @@
 import { EMPLOYEE_STATUS_LABELS, type EmployeeStatus } from '@eam/shared';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Search, Users } from 'lucide-react';
+import { Plus, Printer, Search, Users } from 'lucide-react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { EmployeeStatusBadge } from '@/components/common/badges';
 import { type Column, DataTable, Pagination } from '@/components/common/data-table';
@@ -33,6 +34,7 @@ export default function EmployeesPage() {
   const departments = useDepartments();
   const locations = useLocations();
   const q = useQuery({ queryKey: ['employees', f], queryFn: () => api.get<Page<Employee>>('/employees', f) });
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const columns: Column<Employee>[] = [
     {
@@ -89,11 +91,18 @@ export default function EmployeesPage() {
         title="Employees"
         description={q.data ? `${formatNumber(q.data.total)} ${f.status ? EMPLOYEE_STATUS_LABELS[f.status as EmployeeStatus]?.toLowerCase() : 'current'} employees` : 'People who can hold company assets.'}
         actions={
-          can('employee:manage') && (
-            <Button size="sm" onClick={() => quickAdd.open('employee')}>
-              <Plus /> Add employee
-            </Button>
-          )
+          <>
+            {!!q.data?.items.length && (
+              <Button size="sm" variant="outline" onClick={() => navigate(`/id-cards?ids=${(selected.size ? [...selected] : q.data!.items.map((x) => x.id)).join(',')}`)}>
+                <Printer /> {selected.size ? `Print ${selected.size} ID cards` : 'Print ID cards'}
+              </Button>
+            )}
+            {can('employee:manage') && (
+              <Button size="sm" onClick={() => quickAdd.open('employee')}>
+                <Plus /> Add employee
+              </Button>
+            )}
+          </>
         }
       />
       <div className="mb-3 flex gap-1 overflow-x-auto pb-1 no-scrollbar">
@@ -118,7 +127,7 @@ export default function EmployeesPage() {
         <div className="flex flex-wrap items-center gap-2 border-b p-3">
           <div className="relative min-w-52 flex-1">
             <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, code, email, designation…" className="pl-8" />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, employee ID, phone, email…" className="pl-8" />
           </div>
           <NativeSelect className="w-auto min-w-40" value={f.departmentId ?? ''} onChange={(e) => set({ departmentId: e.target.value })}>
             <option value="">All departments</option>
@@ -141,10 +150,24 @@ export default function EmployeesPage() {
             Holding assets
           </label>
         </div>
+        {selected.size > 0 && (
+          <div className="flex flex-wrap items-center gap-2 border-b bg-primary/5 px-3 py-2 text-sm">
+            <span className="font-medium">{selected.size} selected</span>
+            <Button size="xs" variant="outline" onClick={() => navigate(`/id-cards?ids=${[...selected].join(',')}`)}>
+              <Printer /> Print ID cards
+            </Button>
+            <Button size="xs" variant="ghost" className="ml-auto" onClick={() => setSelected(new Set())}>
+              Clear
+            </Button>
+          </div>
+        )}
         <DataTable
           columns={columns}
           rows={q.data?.items}
           rowKey={(e) => e.id}
+          selectable
+          selected={selected}
+          onSelectedChange={setSelected}
           loading={q.isLoading}
           fetching={q.isFetching}
           error={q.error}

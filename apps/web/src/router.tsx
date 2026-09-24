@@ -15,6 +15,7 @@ const LabelsPage = lazy(() => import('@/features/assets/labels-page'));
 const ScanPage = lazy(() => import('@/features/assets/scan-page'));
 const EmployeesPage = lazy(() => import('@/features/employees/employees-page'));
 const EmployeeDetailPage = lazy(() => import('@/features/employees/employee-detail-page'));
+const IdCardsPage = lazy(() => import('@/features/employees/id-cards-page'));
 const ExitsPage = lazy(() => import('@/features/exits/exits-page'));
 const ExitDetailPage = lazy(() => import('@/features/exits/exit-detail-page'));
 const RequestsPage = lazy(() => import('@/features/service/requests-page'));
@@ -90,6 +91,8 @@ export const router = createBrowserRouter([
           { path: 'labels', element: <LabelsPage /> },
           { path: 'scan', element: <ScanPage /> },
           { path: 'scan/:code', element: <ScanPage /> },
+          { path: 'id/:code', element: <ScanPage /> },
+          { path: 'id-cards', element: <IdCardsPage /> },
           { path: 'employees', element: <EmployeesPage /> },
           { path: 'employees/:id', element: <EmployeeDetailPage /> },
           { path: 'exits', element: <ExitsPage /> },

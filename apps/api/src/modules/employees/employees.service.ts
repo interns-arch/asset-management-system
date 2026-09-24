@@ -104,7 +104,6 @@ export class EmployeesService {
           email: employees.email,
           phone: employees.phone,
           personalPhone: employees.personalPhone,
-          qrCode: employees.qrCode,
           designation: employees.designation,
           status: employees.status,
           joinDate: employees.joinDate,
@@ -219,13 +218,13 @@ export class EmployeesService {
     return this.history.list({ employeeId: id }, listParams(q, { sort: 'occurredAt', pageSize: 100 }));
   }
 
-  /** Scanned person QR (or typed employee code) → the person. */
+  /** A person's QR holds just their employee ID; scanning (or typing) it finds the person. */
   async lookup(actor: Actor, raw: string) {
     const code = normaliseCode(raw);
     const [row] = await this.dbs.db
       .select({ id: employees.id, fullName: employees.fullName, employeeCode: employees.employeeCode })
       .from(employees)
-      .where(or(eq(employees.qrCode, code), sql`lower(${employees.employeeCode}) = lower(${code})`))
+      .where(sql`lower(${employees.employeeCode}) = lower(${code})`)
       .limit(1);
     if (!row || !this.canSee(actor, row.id)) throw new NotFoundException(`No person matches "${code}"`);
     return row;
@@ -307,7 +306,7 @@ export class EmployeesService {
   async create(actor: Actor, input: EmployeeInput) {
     await this.assertManager(null, input.managerId);
     return this.dbs.tx(async (db) => {
-      const [row] = await db.insert(employees).values({ ...input, qrCode: qrToken() }).returning();
+      const [row] = await db.insert(employees).values(input).returning();
       await this.history.record(actor, {
         entityType: 'EMPLOYEE',
         entityId: row.id,

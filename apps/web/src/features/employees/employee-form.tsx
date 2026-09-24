@@ -25,6 +25,8 @@ export default function EmployeeForm({ open, onOpenChange, record, defaults }: F
     lastName: v(emp?.lastName),
     email: v(emp?.email),
     phone: v(emp?.phone),
+    personalEmail: v(emp?.personalEmail),
+    personalPhone: v(emp?.personalPhone),
     designation: v(emp?.designation),
     companyId: v(emp?.companyId ?? defaults?.companyId ?? companies.data?.[0]?.id),
     departmentId: v(emp?.departmentId ?? defaults?.departmentId),
@@ -66,17 +68,23 @@ export default function EmployeeForm({ open, onOpenChange, record, defaults }: F
           <Field label="Last name" error={e('lastName')}>
             <Input autoComplete="off" {...form.register('lastName')} />
           </Field>
-          <Field label="Employee code" required error={e('employeeCode')} hint="Your HR / payroll ID">
-            <Input className="font-mono uppercase" placeholder="ACM1042" {...form.register('employeeCode')} />
+          <Field label="Employee ID" required error={e('employeeCode')} hint="e.g. CT000099 — also their login ID">
+            <Input className="font-mono uppercase" placeholder="CT000099" {...form.register('employeeCode')} />
           </Field>
           <Field label="Designation" error={e('designation')}>
             <Input placeholder="Sales Executive" {...form.register('designation')} />
           </Field>
-          <Field label="Work email" error={e('email')}>
-            <Input type="email" {...form.register('email')} />
+          <Field label="Official phone" error={e('phone')} hint="Company SIM, if any">
+            <Input type="tel" inputMode="tel" {...form.register('phone')} />
           </Field>
-          <Field label="Phone" error={e('phone')}>
-            <Input type="tel" {...form.register('phone')} />
+          <Field label="Personal phone" error={e('personalPhone')}>
+            <Input type="tel" inputMode="tel" {...form.register('personalPhone')} />
+          </Field>
+          <Field label="Official email" error={e('email')}>
+            <Input type="email" inputMode="email" autoCapitalize="none" {...form.register('email')} />
+          </Field>
+          <Field label="Personal email" error={e('personalEmail')}>
+            <Input type="email" inputMode="email" autoCapitalize="none" {...form.register('personalEmail')} />
           </Field>
         </div>
       </FormSection>

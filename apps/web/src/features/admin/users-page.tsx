@@ -34,7 +34,7 @@ export default function UsersPage() {
           <Avatar name={u.name} />
           <div className="min-w-0">
             <div className="truncate font-medium">{u.name}</div>
-            <div className="truncate text-xs text-muted-foreground">{u.email}</div>
+            <div className="truncate text-xs text-muted-foreground">{u.email ?? (u.employeeCode ? `Signs in with ${u.employeeCode}` : '—')}</div>
           </div>
         </div>
       ),
@@ -110,7 +110,7 @@ function UserSheet({ user, onClose }: { user: UserRow | null; onClose: () => voi
         <Field label="Name" required error={e('name')}>
           <Input {...form.register('name')} />
         </Field>
-        <Field label="Email" required={!editing} error={e('email')} hint={editing ? 'Email cannot be changed' : undefined}>
+        <Field label="Email" error={e('email')} hint={editing ? 'Email cannot be changed' : 'Optional if linked to an employee — they sign in with their employee ID'}>
           <Input type="email" disabled={editing} {...form.register('email')} />
         </Field>
         <Field label={editing ? 'Reset password' : 'Password'} required={!editing} error={e('password')} hint={editing ? 'Leave blank to keep the current password' : 'At least 8 characters'}>

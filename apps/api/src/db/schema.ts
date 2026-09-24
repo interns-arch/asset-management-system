@@ -122,8 +122,6 @@ export const employees = pgTable(
     personalEmail: text('personal_email'),
     personalPhone: text('personal_phone'),
     designation: text('designation'),
-    // One QR per person: printed on the ID card, opens the person's assets when scanned.
-    qrCode: text('qr_code').notNull().unique(),
     assetsVerifiedAt: timestamp('assets_verified_at', { withTimezone: true }),
     assetsVerifiedByName: text('assets_verified_by_name'),
     companyId: uuid('company_id').references(() => companies.id, { onDelete: 'set null' }),

@@ -1,4 +1,4 @@
-import { KeyRound, LogOut, Menu, Moon, Plus, ScanLine, Search, Sun } from 'lucide-react';
+import { KeyRound, LogOut, Menu, Moon, Plus, QrCode, ScanLine, Search, Sun } from 'lucide-react';
 import { Suspense, useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
@@ -26,6 +26,7 @@ import { useQuickAdd } from '@/features/quick-add/quick-add';
 import { api, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useHotkeys, useScannerInput } from '@/lib/hotkeys';
+import { resolveCode } from '@/lib/scan';
 import { cn } from '@/lib/utils';
 import { CommandPalette } from './command-palette';
 import { MAIN_NAV, type NavItem, QUICK_ADD, SETTINGS_NAV } from './nav';
@@ -99,7 +100,13 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <Brand />
       </div>
       <nav className="flex-1 overflow-y-auto px-2.5 py-3 scrollbar-thin">
-        <NavSection items={MAIN_NAV.map((n) => (n.to === '/assets' && me && !me.permissions.includes('asset:view') ? { ...n, label: 'My assets' } : n))} onNavigate={onNavigate} />
+        <NavSection
+          items={[
+            ...MAIN_NAV.map((n) => (n.to === '/assets' && me && !me.permissions.includes('asset:view') ? { ...n, label: 'My assets' } : n)),
+            ...(me?.employee ? [{ label: 'My QR & profile', to: `/employees/${me.employee.id}`, icon: QrCode }] : []),
+          ]}
+          onNavigate={onNavigate}
+        />
         <NavSection title="Settings" items={SETTINGS_NAV} onNavigate={onNavigate} />
       </nav>
       <div className="border-t border-sidebar-border p-3 text-[11px] text-muted-foreground">
@@ -200,10 +207,11 @@ export function AppShell() {
   // USB barcode / QR scanners type fast and press Enter — jump straight to the asset.
   useScannerInput(async (code) => {
     if (location.pathname.startsWith('/exits/')) return; // the exit checklist handles scans itself
+    if (!can('asset:view', 'employee:view')) return;
     try {
-      const a = await api.get<{ id: string; assetTag: string }>('/assets/lookup', { code });
-      navigate(`/assets/${a.id}`);
-      toast.success(`Scanned ${a.assetTag}`);
+      const r = await resolveCode(code);
+      navigate(r.to);
+      toast.success(`Scanned ${r.label}`);
     } catch (err) {
       toast.error(errorMessage(err));
     }
@@ -274,7 +282,7 @@ export function AppShell() {
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
-            <Button variant="ghost" size="icon-sm" className="hidden sm:inline-flex" onClick={() => navigate('/scan')} aria-label="Scan QR or barcode" title="Scan">
+            <Button variant="ghost" size="icon-sm" className={cn('hidden', can('asset:view', 'employee:view') && 'sm:inline-flex')} onClick={() => navigate('/scan')} aria-label="Scan QR or barcode" title="Scan">
               <ScanLine />
             </Button>
             <NotificationBell />
@@ -290,13 +298,17 @@ export function AppShell() {
               <DropdownMenuContent align="end" className="w-60">
                 <div className="px-2 py-1.5">
                   <p className="truncate text-sm font-medium">{me?.user.name}</p>
-                  <p className="truncate text-xs text-muted-foreground">{me?.user.email}</p>
+                  <p className="truncate text-xs text-muted-foreground">{me?.user.email ?? me?.employee?.employeeCode}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     Role: <span className="font-medium text-foreground">{me?.role.name}</span>
                   </p>
                 </div>
                 <DropdownMenuSeparator />
-                {me?.employee && <DropdownMenuItem onSelect={() => navigate(`/employees/${me.employee!.id}`)}>My profile & assets</DropdownMenuItem>}
+                {me?.employee && (
+                  <DropdownMenuItem onSelect={() => navigate(`/employees/${me.employee!.id}`)}>
+                    <QrCode /> My QR & profile
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onSelect={() => setPwd(true)}>
                   <KeyRound /> Change password
                 </DropdownMenuItem>

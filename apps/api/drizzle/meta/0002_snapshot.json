@@ -1,5 +1,5 @@
 {
-  "id": "6ff0606b-1a31-4975-b780-b10bc08d7f7c",
+  "id": "d40b117f-0ea4-4ec4-ae56-b53996cd7782",
   "prevId": "0717d1eb-4028-466a-8780-73df22ceedab",
   "version": "7",
   "dialect": "postgresql",
@@ -1430,12 +1430,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "qr_code": {
-          "name": "qr_code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
         "assets_verified_at": {
           "name": "assets_verified_at",
           "type": "timestamp with time zone",
@@ -1654,13 +1648,6 @@
           "nullsNotDistinct": false,
           "columns": [
             "email"
-          ]
-        },
-        "employees_qr_code_unique": {
-          "name": "employees_qr_code_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "qr_code"
           ]
         }
       },
