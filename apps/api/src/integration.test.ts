@@ -34,7 +34,7 @@ async function login(who: string, email: string) {
   const res = await fetch(`${base}/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-requested-with': 'XMLHttpRequest' },
-    body: JSON.stringify({ email, password: PASSWORD }),
+    body: JSON.stringify({ login: email, password: PASSWORD }),
   });
   assert.equal(res.status, 200, `login ${email}`);
   cookies[who] = res.headers.get('set-cookie')!.split(';')[0];
@@ -112,6 +112,70 @@ describe('security', () => {
     assert.equal((await call('GET', `/assets/${other.body.id}`, undefined, 'bob')).status, 404);
     assert.equal((await call('GET', '/employees', undefined, 'bob')).status, 403);
     assert.equal((await call('POST', '/categories', { name: 'Nope', code: 'NOPE' }, 'bob')).status, 403);
+  });
+});
+
+describe('one QR per person and view-only logins', () => {
+  test('every employee gets a unique QR that resolves to the person', async () => {
+    const a = await call('GET', `/employees/${ids.alice}`);
+    const b = await call('GET', `/employees/${ids.bob}`);
+    assert.match(a.body.qrCode, /^[a-z0-9]{12}$/);
+    assert.notEqual(a.body.qrCode, b.body.qrCode);
+    for (const code of [a.body.qrCode, `https://assets.example.com/id/${a.body.qrCode}`, 't001']) {
+      const r = await call('GET', `/employees/lookup?code=${encodeURIComponent(code)}`);
+      assert.equal(r.status, 200, code);
+      assert.equal(r.body.id, ids.alice);
+    }
+    // An employee can resolve their own QR but not someone else's.
+    assert.equal((await call('GET', `/employees/lookup?code=${b.body.qrCode}`, undefined, 'bob')).status, 200);
+    assert.equal((await call('GET', `/employees/lookup?code=${a.body.qrCode}`, undefined, 'bob')).status, 404);
+  });
+
+  test('IT gives an employee a login; they sign in with their employee ID and can only view', async () => {
+    const emp = await call('POST', '/employees', { employeeCode: 'ct000099', firstName: 'Anurag', lastName: 'Gupta', email: 'NA', phone: 'NA', personalPhone: '9971194578' });
+    assert.equal(emp.status, 201);
+    assert.equal(emp.body.employeeCode, 'CT000099');
+    assert.equal(emp.body.email, null, '"NA" is stored as empty');
+    const laptop = await newDrone({ name: 'Assigned to Anurag' });
+    await call('POST', `/assets/${laptop.body.id}/assign`, { holderType: 'EMPLOYEE', holderId: emp.body.id }, 'it');
+
+    // IT has full access, including giving logins.
+    const grant = await call('POST', `/employees/${emp.body.id}/access`, {}, 'it');
+    assert.equal(grant.status, 200);
+    assert.equal(grant.body.loginId, 'CT000099');
+    assert.equal(grant.body.email, null);
+    assert.ok(grant.body.password.length >= 8);
+
+    const res = await fetch(`${base}/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-requested-with': 'XMLHttpRequest' },
+      body: JSON.stringify({ login: 'ct000099', password: grant.body.password }),
+    });
+    assert.equal(res.status, 200);
+    cookies.anurag = res.headers.get('set-cookie')!.split(';')[0];
+    const me = await call('GET', '/auth/me', undefined, 'anurag');
+    assert.equal(me.body.role.name, 'Employee');
+
+    const mine = await call('GET', '/assets', undefined, 'anurag');
+    assert.deepEqual(mine.body.items.map((x: { id: string }) => x.id), [laptop.body.id]);
+    // View only: no changes to assets, people or logins.
+    assert.equal((await call('PATCH', `/assets/${laptop.body.id}`, { name: 'Mine now', version: laptop.body.version }, 'anurag')).status, 403);
+    assert.equal((await call('POST', `/assets/${laptop.body.id}/return`, { condition: 'GOOD' }, 'anurag')).status, 403);
+    assert.equal((await call('POST', `/employees/${emp.body.id}/verify-assets`, {}, 'anurag')).status, 403);
+    assert.equal((await call('POST', `/employees/${emp.body.id}/access`, {}, 'anurag')).status, 403);
+
+    // Resetting issues a new password and signs the old sessions out.
+    const reset = await call('POST', `/employees/${emp.body.id}/access`, {}, 'it');
+    assert.equal(reset.body.created, false);
+    assert.equal((await call('GET', '/auth/me', undefined, 'anurag')).status, 401);
+  });
+
+  test('IT records that a person still has their assets', async () => {
+    const r = await call('POST', `/employees/${ids.bob}/verify-assets`, { note: 'Checked at desk' }, 'it');
+    assert.equal(r.status, 200);
+    assert.ok(r.body.assetsVerifiedAt);
+    const history = await call('GET', `/employees/${ids.bob}/history`);
+    assert.equal(history.body.items[0].action, 'ASSETS_VERIFIED');
   });
 });
 
@@ -251,10 +315,10 @@ describe('employee exit', () => {
     const notice = await call('POST', `/employees/${emp.body.id}/status`, { status: 'NOTICE_PERIOD', lastWorkingDate: '2030-02-28' });
     const caseId = notice.body.exitCaseId;
 
-    // IT can recover assets but may not override.
-    assert.equal((await call('POST', `/exit-cases/${caseId}/override`, { reason: 'Because I said so, really' }, 'it')).status, 403);
-    assert.equal((await call('POST', `/exit-cases/${caseId}/override`, { reason: 'short' })).status, 400);
-    const ok = await call('POST', `/exit-cases/${caseId}/override`, { reason: 'Cost recovered from final settlement' });
+    // Only full-access users (IT / Admin) may override; a reason is required.
+    assert.equal((await call('POST', `/exit-cases/${caseId}/override`, { reason: 'Because I said so, really' }, 'bob')).status, 403);
+    assert.equal((await call('POST', `/exit-cases/${caseId}/override`, { reason: 'short' }, 'it')).status, 400);
+    const ok = await call('POST', `/exit-cases/${caseId}/override`, { reason: 'Cost recovered from final settlement' }, 'it');
     assert.equal(ok.status, 200);
     assert.equal((await call('GET', `/assets/${drone.body.id}`)).body.status, 'LOST');
     const exit = await call('GET', `/exit-cases/${caseId}`);

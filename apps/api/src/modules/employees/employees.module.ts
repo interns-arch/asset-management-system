@@ -1,7 +1,16 @@
 import { Body, Controller, Get, HttpCode, Module, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
-import { employeeSchema, type EmployeeInput, employeeStatusSchema, type EmployeeStatusInput } from '@eam/shared';
+import {
+  employeeAccessSchema,
+  type EmployeeAccessInput,
+  employeeSchema,
+  type EmployeeInput,
+  employeeStatusSchema,
+  type EmployeeStatusInput,
+  optText,
+} from '@eam/shared';
+import { z } from 'zod';
 import type { Actor } from '../../common/actor';
-import { CurrentActor, RequirePermissions, ZodPipe } from '../../common/http';
+import { badRequest, CurrentActor, RequirePermissions, ZodPipe } from '../../common/http';
 import { ExitModule } from '../exit/exit.module';
 import { EmployeesService } from './employees.service';
 
@@ -12,6 +21,12 @@ export class EmployeesController {
   @Get()
   list(@CurrentActor() actor: Actor, @Query() q: Record<string, string>) {
     return this.employees.list(actor, q);
+  }
+
+  @Get('lookup')
+  lookup(@CurrentActor() actor: Actor, @Query('code') code: string) {
+    if (!code) throw badRequest('Enter or scan a code');
+    return this.employees.lookup(actor, code);
   }
 
   @Get(':id')
@@ -39,6 +54,19 @@ export class EmployeesController {
   @RequirePermissions('employee:manage')
   update(@CurrentActor() actor: Actor, @Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(employeeSchema)) body: EmployeeInput) {
     return this.employees.update(actor, id, body);
+  }
+
+  @Post(':id/verify-assets')
+  @HttpCode(200)
+  verify(@CurrentActor() actor: Actor, @Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(z.object({ note: optText(500) }))) body: { note?: string | null }) {
+    return this.employees.verifyAssets(actor, id, body.note);
+  }
+
+  @Post(':id/access')
+  @HttpCode(200)
+  @RequirePermissions('user:manage')
+  access(@CurrentActor() actor: Actor, @Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(employeeAccessSchema)) body: EmployeeAccessInput) {
+    return this.employees.grantAccess(actor, id, body);
   }
 
   @Post(':id/status')

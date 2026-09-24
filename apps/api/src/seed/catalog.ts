@@ -54,6 +54,8 @@ export const CATALOG: SeedCategory[] = [
           { label: 'Storage Type', type: 'select', options: ['NVMe SSD', 'SSD', 'HDD'] },
           { label: 'Operating System', type: 'select', options: OS, showInTable: true },
           { label: 'Screen Size (inch)', type: 'number', min: 7, max: 21 },
+          { label: 'Device Name', type: 'text', placeholder: 'LAPTOP-H7K6BRU', helpText: 'Windows: Settings → System → About' },
+          { label: 'Device ID', type: 'text', isUnique: true, placeholder: 'F3D24A1C-4716-4E0A-9502-8A1269E160B5' },
         ],
       },
       {
@@ -377,6 +379,16 @@ export const CATALOG: SeedCategory[] = [
     color: 'stone',
     description: 'Property, leased assets, inventory and anything else',
     types: [
+      {
+        name: 'Corporate Card',
+        code: 'CRD',
+        icon: 'credit-card',
+        fields: [
+          { label: 'Card Last 4 Digits', type: 'text', required: true, min: 4, max: 4, showInTable: true, helpText: 'Never store the full card number' },
+          { label: 'Issuing Bank', type: 'text', showInTable: true },
+          { label: 'Monthly Limit', type: 'currency' },
+        ],
+      },
       { name: 'Company Property', code: 'PRP', icon: 'house', fields: [{ label: 'Address', type: 'textarea', required: true }, { label: 'Area (sq ft)', type: 'number' }] },
       {
         name: 'Leased Asset',

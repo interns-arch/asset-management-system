@@ -21,7 +21,7 @@ import { NotificationsService } from '../../core/notifications.service';
 import { SequenceService } from '../../core/sequence.service';
 import { AuthService } from '../auth/auth.service';
 import { AllocationService } from '../assets/allocation.service';
-import { normaliseCode } from '../assets/assets.service';
+import { normaliseCode } from '../../common/codes';
 import { LifecycleService } from '../assets/lifecycle.service';
 
 type ExitCaseRow = typeof exitCases.$inferSelect;

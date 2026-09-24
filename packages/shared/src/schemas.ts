@@ -29,6 +29,10 @@ export const reqId = z.string({ message: 'Required' }).uuid('Required');
 export const optDate = z.preprocess(blankToNull, z.string().regex(DATE_RE, 'Invalid date').nullable().optional());
 export const reqDate = z.string({ message: 'Required' }).regex(DATE_RE, 'Required');
 export const optEmail = z.preprocess(blankToNull, z.string().trim().toLowerCase().email('Invalid email').nullable().optional());
+/** Registers often write "NA" for a missing phone or email; treat it as empty. */
+const naToNull = (v: unknown) => (typeof v === 'string' && /^\s*(n\/?a|-+)\s*$/i.test(v) ? null : blankToNull(v));
+const contactEmail = z.preprocess(naToNull, z.string().trim().toLowerCase().email('Invalid email').nullable().optional());
+const contactPhone = z.preprocess(naToNull, z.string().trim().max(40, 'Too long').nullable().optional());
 export const optNumber = z.preprocess(
   (v) => (v === '' || v === null || v === undefined ? null : typeof v === 'string' ? Number(v) : v),
   z.number({ message: 'Must be a number' }).finite('Must be a number').nullable().optional(),
@@ -45,8 +49,9 @@ const code = z.preprocess(
 );
 
 // ─── Auth ───────────────────────────────────────────────────────────────────
+/** Sign in with an email address or an employee code (e.g. CT000099). */
 export const loginSchema = z.object({
-  email: z.string().trim().toLowerCase().email('Enter a valid email'),
+  login: z.string().trim().min(1, 'Enter your email or employee ID').max(200),
   password: z.string().min(1, 'Enter your password'),
 });
 export const changePasswordSchema = z.object({
@@ -91,8 +96,10 @@ export const employeeSchema = z.object({
   employeeCode: z.string().trim().min(1, 'Required').max(40).toUpperCase(),
   firstName: reqText(100),
   lastName: optText(100),
-  email: optEmail,
-  phone: optText(40),
+  email: contactEmail,
+  phone: contactPhone,
+  personalEmail: contactEmail,
+  personalPhone: contactPhone,
   designation: optText(120),
   companyId: optId,
   departmentId: optId,
@@ -302,13 +309,23 @@ export const maintenanceUpdateSchema = z.object({
 });
 
 // ─── Users & roles ──────────────────────────────────────────────────────────
-export const userCreateSchema = z.object({
-  name: reqText(150),
-  email: z.string().trim().toLowerCase().email('Invalid email'),
-  password: z.string().min(8, 'At least 8 characters').max(200),
-  roleId: reqId,
-  employeeId: optId,
-  isActive: z.boolean().default(true),
+export const userCreateSchema = z
+  .object({
+    name: reqText(150),
+    email: optEmail,
+    password: z.string().min(8, 'At least 8 characters').max(200),
+    roleId: reqId,
+    employeeId: optId,
+    isActive: z.boolean().default(true),
+  })
+  .refine((v) => !!v.email || !!v.employeeId, {
+    message: 'Enter an email or link an employee (they can sign in with their employee ID)',
+    path: ['email'],
+  });
+/** Give an employee a portal login. Without a password one is generated and shown once. */
+export const employeeAccessSchema = z.object({
+  roleId: optId,
+  password: z.preprocess(blankToNull, z.string().min(8, 'At least 8 characters').max(200).nullable().optional()),
 });
 export const userUpdateSchema = z.object({
   name: reqText(150).optional(),
@@ -349,4 +366,5 @@ export type MaintenanceInput = z.infer<typeof maintenanceSchema>;
 export type MaintenanceUpdateInput = z.infer<typeof maintenanceUpdateSchema>;
 export type UserCreateInput = z.infer<typeof userCreateSchema>;
 export type UserUpdateInput = z.infer<typeof userUpdateSchema>;
+export type EmployeeAccessInput = z.infer<typeof employeeAccessSchema>;
 export type RoleInput = z.infer<typeof roleSchema>;

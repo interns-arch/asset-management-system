@@ -116,9 +116,16 @@ export const employees = pgTable(
     fullName: text('full_name')
       .notNull()
       .generatedAlwaysAs(sql`trim(first_name || ' ' || coalesce(last_name, ''))`),
+    // Official contact details; personal ones are kept separately.
     email: text('email').unique(),
     phone: text('phone'),
+    personalEmail: text('personal_email'),
+    personalPhone: text('personal_phone'),
     designation: text('designation'),
+    // One QR per person: printed on the ID card, opens the person's assets when scanned.
+    qrCode: text('qr_code').notNull().unique(),
+    assetsVerifiedAt: timestamp('assets_verified_at', { withTimezone: true }),
+    assetsVerifiedByName: text('assets_verified_by_name'),
     companyId: uuid('company_id').references(() => companies.id, { onDelete: 'set null' }),
     departmentId: uuid('department_id').references(() => departments.id, { onDelete: 'set null' }),
     locationId: uuid('location_id').references(() => locations.id, { onDelete: 'set null' }),
@@ -136,6 +143,7 @@ export const employees = pgTable(
     index('employees_status_idx').on(t.status),
     index('employees_department_idx').on(t.departmentId),
     index('employees_name_idx').on(sql`lower(${t.fullName})`),
+    uniqueIndex('employees_code_lower_idx').on(sql`lower(${t.employeeCode})`),
   ],
 );
 
@@ -153,7 +161,8 @@ export const roles = pgTable('roles', {
 
 export const users = pgTable('users', {
   id: pk(),
-  email: text('email').notNull().unique(),
+  // Optional: employees without an email sign in with their employee code.
+  email: text('email').unique(),
   name: text('name').notNull(),
   passwordHash: text('password_hash').notNull(),
   roleId: uuid('role_id')

@@ -33,6 +33,9 @@ const daysFromNow = (d: number) => {
 };
 const serial = (prefix: string) => `${prefix}${Array.from({ length: 8 }, () => pick('ABCDEFGHJKLMNPQRSTUVWXYZ0123456789'.split(''))).join('')}`;
 
+const hex = (n: number) => Array.from({ length: n }, () => '0123456789ABCDEF'[Math.floor(rand() * 16)]).join('');
+const deviceId = () => `${hex(8)}-${hex(4)}-${hex(4)}-${hex(4)}-${hex(12)}`;
+
 const FIRST = ['Aarav', 'Vivaan', 'Aditya', 'Ananya', 'Diya', 'Ishaan', 'Kavya', 'Rohan', 'Sneha', 'Arjun', 'Meera', 'Nikhil', 'Pooja', 'Siddharth', 'Tanvi', 'Varun', 'Riya', 'Harsh', 'Divya', 'Kunal', 'Aisha', 'Manish', 'Shreya', 'Yash', 'Nisha', 'Gaurav', 'Priya', 'Amit', 'Swati', 'Rajesh'];
 const LAST = ['Patel', 'Iyer', 'Gupta', 'Reddy', 'Nair', 'Joshi', 'Kulkarni', 'Desai', 'Menon', 'Chopra', 'Bose', 'Pillai', 'Verma', 'Shetty', 'Bhat', 'Agarwal', 'Mishra', 'Khanna'];
 
@@ -165,6 +168,8 @@ async function main() {
       lastName,
       email: `${firstName}.${lastName}`.toLowerCase().replace(/[^a-z.]/g, '') + '@acme.test',
       phone: `+91 9${int(100000000, 999999999)}`,
+      personalPhone: `+91 ${pick(['6', '7', '8', '9'])}${int(100000000, 999999999)}`,
+      personalEmail: `${firstName.toLowerCase()}${int(10, 99)}@gmail.test`,
       designation,
       companyId: acme.id,
       departmentId,
@@ -285,6 +290,7 @@ async function main() {
         storage_type: 'NVMe SSD',
         operating_system: mac ? 'macOS' : 'Windows 11',
         screen_size_inch: 14,
+        ...(mac ? {} : { device_name: `LAPTOP-${serial('').slice(0, 7)}`, device_id: deviceId() }),
       },
       { holder, vendorId: lm.v, manufacturer: lm.m, model: lm.model, cost: lm.cost, ...extra },
     );
@@ -401,6 +407,21 @@ async function main() {
   await add('STN', 'Welcome Stationery Kit', { unit: 'Kit' }, { quantity: 80, serial: null, cost: 24000, locationId: itStore });
   await add('INV', 'USB-C to HDMI Adapter', { sku: 'ADP-UC-HDMI' }, { quantity: 40, serial: null, cost: 32000, locationId: itStore });
 
+  // A warehouse worker with no email: signs in with his employee ID and only sees his own kit.
+  const anil = await emp('Anil', 'Yadav', depts.logistics, 'Picker and Packer', {
+    employeeCode: 'ACM1099',
+    email: null,
+    phone: null,
+    personalEmail: null,
+    locationId: pune,
+    companyId: logistics.id,
+  });
+  await add('HLM', 'Karam Safety Helmet', { size: 'L', isi_certified: true }, { holder: toEmp(anil), vendorId: vendors.karam, cost: 650, serial: null });
+  await add('SHO', 'Karam FS 21 Safety Shoes', { size_uk: 8 }, { holder: toEmp(anil), cost: 1900, serial: null });
+  await add('ACC', 'Access Card — Pune Warehouse', { card_number: 'AC-PUN-20781', access_zones: ['Main Entrance', 'Warehouse'] }, { holder: toEmp(anil), serial: null, cost: 350 });
+  await allocation.assign(admin, gloves, { holderType: 'EMPLOYEE', holderId: anil, quantity: 4 });
+  await employeesSvc.grantAccess(admin, anil, { password: DEMO_PASSWORD });
+
   // ── Lifecycle variety: maintenance, vendor repair, retired, lost ────────
   const repairLaptop = await laptop(toEmp(staff[8]), 3);
   await maintenance.create(admin, { assetId: repairLaptop, type: 'REPAIR', title: 'Keyboard not responding', description: 'Several keys unresponsive after liquid spill', vendorId: vendors.service, cost: 6500, startNow: true, scheduledDate: null });
@@ -444,8 +465,8 @@ async function main() {
   await tickets.create(admin, { title: 'Lost phone — block SIM and wipe device', description: 'Staff member reported the phone lost.', assetId: lostPhone, type: 'LOSS', priority: 'URGENT' });
 
   const [{ assetCount }] = await dbs.root.select({ assetCount: sql<number>`count(*)::int` }).from(sql`assets`);
-  console.log(`✔ Seeded demo data: ${assetCount} assets, ${staff.length + 5} employees, ${Object.keys(types).length} asset types.`);
-  console.log(`  Sign in with admin@acme.test / ${DEMO_PASSWORD} (also it@, hr@, manager@, rahul@acme.test)`);
+  console.log(`✔ Seeded demo data: ${assetCount} assets, ${staff.length + 6} employees, ${Object.keys(types).length} asset types.`);
+  console.log(`  Sign in with admin@acme.test / ${DEMO_PASSWORD} (also it@, hr@, manager@, rahul@acme.test, or employee ID ACM1099)`);
   await app.close();
 }
 

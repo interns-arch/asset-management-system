@@ -65,7 +65,7 @@ export class AdminService {
         .insert(users)
         .values({ ...input, passwordHash: await hashPassword(input.password) })
         .returning({ id: users.id, name: users.name, email: users.email });
-      await this.history.record(actor, { entityType: 'USER', entityId: row.id, entityLabel: row.email, action: 'CREATED', summary: `User ${row.email} created` });
+      await this.history.record(actor, { entityType: 'USER', entityId: row.id, entityLabel: row.email ?? row.name, action: 'CREATED', summary: `User ${row.email ?? row.name} created` });
       return row;
     });
   }
@@ -91,7 +91,7 @@ export class AdminService {
         await this.auth.revokeUserSessions(id);
       }
       if (changes.length) {
-        await this.history.record(actor, { entityType: 'USER', entityId: id, entityLabel: before.email, action: 'UPDATED', summary: `User ${before.email} updated`, changes });
+        await this.history.record(actor, { entityType: 'USER', entityId: id, entityLabel: before.email ?? before.name, action: 'UPDATED', summary: `User ${before.email ?? before.name} updated`, changes });
       }
       return { ok: true };
     });

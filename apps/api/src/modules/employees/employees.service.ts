@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, desc, eq, ilike, inArray, or, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
-import { EMPLOYEE_STATUS_LABELS, EMPLOYEE_STATUSES, type EmployeeInput, type EmployeeStatusInput } from '@eam/shared';
+import { EMPLOYEE_STATUS_LABELS, EMPLOYEE_STATUSES, type EmployeeAccessInput, type EmployeeInput, type EmployeeStatusInput } from '@eam/shared';
 import { type Actor, assertCan, can } from '../../common/actor';
+import { normaliseCode, qrToken } from '../../common/codes';
 import { badRequest, likePattern, listFilter, listParams, notFound, today, uuidParam } from '../../common/http';
 import { DbService } from '../../db/db.service';
 import {
@@ -19,6 +20,7 @@ import {
   users,
 } from '../../db/schema';
 import { diffChanges, HistoryService } from '../../core/history.service';
+import { AuthService, hashPassword } from '../auth/auth.service';
 import { ExitService } from '../exit/exit.service';
 
 const manager = alias(employees, 'manager');
@@ -27,8 +29,10 @@ const LABELS: Record<string, string> = {
   employeeCode: 'Employee code',
   firstName: 'First name',
   lastName: 'Last name',
-  email: 'Email',
-  phone: 'Phone',
+  email: 'Official email',
+  phone: 'Official phone',
+  personalEmail: 'Personal email',
+  personalPhone: 'Personal phone',
   designation: 'Designation',
   companyId: 'Company',
   departmentId: 'Department',
@@ -44,6 +48,7 @@ export class EmployeesService {
     private readonly dbs: DbService,
     private readonly history: HistoryService,
     private readonly exits: ExitService,
+    private readonly auth: AuthService,
   ) {}
 
   private canSee(actor: Actor, id: string) {
@@ -72,7 +77,15 @@ export class EmployeesService {
     if (p.search) {
       const like = likePattern(p.search);
       conds.push(
-        or(ilike(employees.fullName, like), ilike(employees.employeeCode, like), ilike(employees.email, like), ilike(employees.designation, like))!,
+        or(
+          ilike(employees.fullName, like),
+          ilike(employees.employeeCode, like),
+          ilike(employees.email, like),
+          ilike(employees.personalEmail, like),
+          ilike(employees.phone, like),
+          ilike(employees.personalPhone, like),
+          ilike(employees.designation, like),
+        )!,
       );
     }
     const where = conds.length ? and(...conds) : undefined;
@@ -90,6 +103,8 @@ export class EmployeesService {
           lastName: employees.lastName,
           email: employees.email,
           phone: employees.phone,
+          personalPhone: employees.personalPhone,
+          qrCode: employees.qrCode,
           designation: employees.designation,
           status: employees.status,
           joinDate: employees.joinDate,
@@ -204,6 +219,86 @@ export class EmployeesService {
     return this.history.list({ employeeId: id }, listParams(q, { sort: 'occurredAt', pageSize: 100 }));
   }
 
+  /** Scanned person QR (or typed employee code) → the person. */
+  async lookup(actor: Actor, raw: string) {
+    const code = normaliseCode(raw);
+    const [row] = await this.dbs.db
+      .select({ id: employees.id, fullName: employees.fullName, employeeCode: employees.employeeCode })
+      .from(employees)
+      .where(or(eq(employees.qrCode, code), sql`lower(${employees.employeeCode}) = lower(${code})`))
+      .limit(1);
+    if (!row || !this.canSee(actor, row.id)) throw new NotFoundException(`No person matches "${code}"`);
+    return row;
+  }
+
+  /** IT confirms in person that the employee still has everything assigned (the register's "Last checked on"). */
+  async verifyAssets(actor: Actor, id: string, note?: string | null) {
+    assertCan(actor, 'asset:assign');
+    return this.dbs.tx(async (db) => {
+      const [emp] = await db.select().from(employees).where(eq(employees.id, id)).for('update');
+      if (!emp) throw notFound('Employee');
+      const held = await this.assets(actor, id);
+      const [row] = await db
+        .update(employees)
+        .set({ assetsVerifiedAt: new Date(), assetsVerifiedByName: actor.name, updatedAt: new Date() })
+        .where(eq(employees.id, id))
+        .returning({ assetsVerifiedAt: employees.assetsVerifiedAt, assetsVerifiedByName: employees.assetsVerifiedByName });
+      await this.history.record(actor, {
+        entityType: 'EMPLOYEE',
+        entityId: id,
+        entityLabel: emp.fullName,
+        action: 'ASSETS_VERIFIED',
+        summary: `Assets checked: ${held.length} item(s) confirmed with ${emp.fullName}${note ? ` — ${note}` : ''}`,
+        metadata: { assets: held.map((h) => h.assetTag) },
+      });
+      return row;
+    });
+  }
+
+  /**
+   * Gives an employee a portal login (view-only Employee role by default), or resets it.
+   * They sign in with their employee code, or their email if they have one.
+   * The password is returned once so IT can hand it over; it is never stored in plain text.
+   */
+  async grantAccess(actor: Actor, id: string, input: EmployeeAccessInput) {
+    assertCan(actor, 'user:manage');
+    return this.dbs.tx(async (db) => {
+      const [emp] = await db.select().from(employees).where(eq(employees.id, id)).for('update');
+      if (!emp) throw notFound('Employee');
+      if (emp.status === 'EXITED') throw badRequest(`${emp.fullName} has exited and cannot be given a login.`);
+      const [employeeRole] = await db.select({ id: roles.id }).from(roles).where(eq(roles.name, 'Employee'));
+      const roleId = input.roleId ?? employeeRole?.id;
+      if (!roleId) throw badRequest('Choose a role', { roleId: 'Required' });
+      const password = input.password ?? `${qrToken(4)}-${qrToken(4)}`;
+      const passwordHash = await hashPassword(password);
+      const [existing] = await db.select().from(users).where(eq(users.employeeId, id));
+
+      let email: string | null;
+      if (existing) {
+        email = existing.email;
+        await db
+          .update(users)
+          .set({ passwordHash, isActive: true, failedLogins: 0, lockedUntil: null, ...(input.roleId ? { roleId } : {}), updatedAt: new Date() })
+          .where(eq(users.id, existing.id));
+        await this.auth.revokeUserSessions(existing.id);
+      } else {
+        // Use their email as a second way to sign in, unless another login already has it.
+        const candidate = emp.email ?? emp.personalEmail;
+        const [taken] = candidate ? await db.select({ id: users.id }).from(users).where(eq(users.email, candidate)) : [];
+        email = candidate && !taken ? candidate : null;
+        await db.insert(users).values({ email, name: emp.fullName, passwordHash, roleId, employeeId: id });
+      }
+      await this.history.record(actor, {
+        entityType: 'EMPLOYEE',
+        entityId: id,
+        entityLabel: emp.fullName,
+        action: existing ? 'LOGIN_RESET' : 'LOGIN_GRANTED',
+        summary: existing ? 'Portal password reset' : 'Portal login created',
+      });
+      return { loginId: emp.employeeCode, email, password, created: !existing };
+    });
+  }
+
   private async assertManager(id: string | null, managerId: string | null | undefined) {
     if (!managerId) return;
     if (managerId === id) throw badRequest('An employee cannot manage themselves', { managerId: 'Cannot be the same employee' });
@@ -212,7 +307,7 @@ export class EmployeesService {
   async create(actor: Actor, input: EmployeeInput) {
     await this.assertManager(null, input.managerId);
     return this.dbs.tx(async (db) => {
-      const [row] = await db.insert(employees).values(input).returning();
+      const [row] = await db.insert(employees).values({ ...input, qrCode: qrToken() }).returning();
       await this.history.record(actor, {
         entityType: 'EMPLOYEE',
         entityId: row.id,

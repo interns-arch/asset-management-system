@@ -1,5 +1,4 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { randomBytes } from 'node:crypto';
 import { and, asc, desc, eq, ilike, inArray, isNotNull, or, sql, type SQL } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import {
@@ -15,6 +14,7 @@ import {
   validateAttributes,
 } from '@eam/shared';
 import { type Actor, assertCan, can } from '../../common/actor';
+import { normaliseCode, qrToken } from '../../common/codes';
 import { badRequest, conflict, likePattern, listFilter, listParams, notFound, today, uuidParam } from '../../common/http';
 import { DbService } from '../../db/db.service';
 import {
@@ -35,12 +35,6 @@ import { SequenceService } from '../../core/sequence.service';
 import { CatalogService, type EffectiveField, toFieldDef } from '../catalog/catalog.service';
 import { AllocationService, type AssetRow } from './allocation.service';
 import { LifecycleService } from './lifecycle.service';
-
-const QR_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
-function qrToken(): string {
-  const bytes = randomBytes(12);
-  return Array.from(bytes, (b) => QR_ALPHABET[b % QR_ALPHABET.length]).join('');
-}
 
 const CORE_LABELS: Record<string, string> = {
   name: 'Name',
@@ -75,13 +69,6 @@ const SORTS: Record<string, PgColumn> = {
   category: assetCategories.name,
   location: locations.name,
 };
-
-/** Extracts the QR token from a scanned URL like https://host/scan/abc123, or returns the raw code. */
-export function normaliseCode(raw: string): string {
-  const code = raw.trim();
-  const m = /\/scan\/([A-Za-z0-9_-]+)\/?$/.exec(code);
-  return m ? m[1] : code;
-}
 
 @Injectable()
 export class AssetsService {

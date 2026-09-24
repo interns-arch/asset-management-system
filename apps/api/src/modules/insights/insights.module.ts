@@ -17,7 +17,8 @@ import {
   vendors,
 } from '../../db/schema';
 import { AssetsModule } from '../assets/assets.module';
-import { AssetsService, normaliseCode } from '../assets/assets.service';
+import { normaliseCode } from '../../common/codes';
+import { AssetsService } from '../assets/assets.service';
 import { EmployeesModule } from '../employees/employees.module';
 import { EmployeesService } from '../employees/employees.service';
 

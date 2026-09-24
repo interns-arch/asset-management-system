@@ -48,30 +48,7 @@ export interface RoleTemplate {
 
 export const SYSTEM_ROLES: RoleTemplate[] = [
   { name: 'Admin', description: 'Full access to everything', permissions: ALL_PERMISSIONS },
-  {
-    name: 'IT / Asset Manager',
-    description: 'Manages assets, catalog, recovery, maintenance and tickets',
-    permissions: [
-      'dashboard:view',
-      'asset:view',
-      'asset:create',
-      'asset:edit',
-      'asset:assign',
-      'asset:lifecycle',
-      'catalog:manage',
-      'org:manage',
-      'employee:view',
-      'exit:view',
-      'exit:manage',
-      'request:create',
-      'request:approve',
-      'request:fulfil',
-      'ticket:create',
-      'ticket:manage',
-      'maintenance:manage',
-      'history:view',
-    ],
-  },
+  { name: 'IT / Asset Manager', description: 'Full access: assets, people, logins and settings', permissions: ALL_PERMISSIONS },
   {
     name: 'HR',
     description: 'Manages employees, notice periods and exits',
@@ -94,7 +71,7 @@ export const SYSTEM_ROLES: RoleTemplate[] = [
   },
   {
     name: 'Employee',
-    description: 'Self-service: my assets, requests and tickets',
+    description: 'View only: my assets and my QR, plus requests and tickets',
     permissions: ['request:create', 'ticket:create'],
   },
 ];

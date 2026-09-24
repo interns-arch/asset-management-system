@@ -17,7 +17,7 @@ export class AuthController {
     @Req() req: AuthedRequest,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const { token } = await this.auth.login(body.email, body.password, { ip: req.ip, userAgent: req.headers['user-agent'] });
+    const { token } = await this.auth.login(body.login, body.password, { ip: req.ip, userAgent: req.headers['user-agent'] });
     res.cookie(SESSION_COOKIE, token, {
       httpOnly: true,
       sameSite: 'lax',

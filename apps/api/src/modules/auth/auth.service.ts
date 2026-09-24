@@ -32,12 +32,29 @@ export class AuthService {
 
   constructor(private readonly dbs: DbService) {}
 
-  async login(email: string, password: string, meta: { ip?: string; userAgent?: string }) {
+  /** Finds the account for an email address, or for an employee code such as CT000099. */
+  private async findLogin(login: string) {
     const db = this.dbs.db;
-    const [user] = await db.select().from(users).where(eq(users.email, email.toLowerCase())).limit(1);
+    const id = login.trim();
+    if (id.includes('@')) {
+      const [user] = await db.select().from(users).where(eq(users.email, id.toLowerCase())).limit(1);
+      return user;
+    }
+    const [row] = await db
+      .select({ user: users })
+      .from(users)
+      .innerJoin(employees, eq(employees.id, users.employeeId))
+      .where(sql`lower(${employees.employeeCode}) = lower(${id})`)
+      .limit(1);
+    return row?.user;
+  }
+
+  async login(login: string, password: string, meta: { ip?: string; userAgent?: string }) {
+    const db = this.dbs.db;
+    const user = await this.findLogin(login);
     const ok = await verify(user?.passwordHash ?? (await this.dummyHash), password).catch(() => false);
 
-    if (!user || !user.isActive) throw new UnauthorizedException('Invalid email or password');
+    if (!user || !user.isActive) throw new UnauthorizedException('Wrong email / employee ID or password');
     if (user.lockedUntil && user.lockedUntil > new Date()) {
       throw new UnauthorizedException('Too many failed attempts. Try again in a few minutes.');
     }
@@ -47,7 +64,7 @@ export class AuthService {
         .update(users)
         .set({ failedLogins: failed, lockedUntil: failed >= MAX_FAILED_LOGINS ? new Date(Date.now() + LOCK_MS) : null })
         .where(eq(users.id, user.id));
-      throw new UnauthorizedException('Invalid email or password');
+      throw new UnauthorizedException('Wrong email / employee ID or password');
     }
 
     await db.update(users).set({ failedLogins: 0, lockedUntil: null, lastLoginAt: new Date() }).where(eq(users.id, user.id));
