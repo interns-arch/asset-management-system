@@ -11,6 +11,9 @@ Tracks the build milestones so work can resume after any interruption.
 - [x] 7. Web app (React): shell, pages, forms, keyboard shortcuts, responsive + dark mode
 - [x] 8. Automated tests (22 passing), end-to-end browser check of the exit flow, production build, README
 
+- [x] 9. One QR per person (QR = employee ID), unified Scan, phone-first person page, ID cards,
+       view-only employee logins by employee ID, IT full access, "Mark checked" (2026-09-24)
+
 ## Possible next steps
 - AI assistant on top of the permission-checked API (the design already allows it)
 - Email notifications (SMTP) in addition to in-app notifications

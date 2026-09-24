@@ -18,7 +18,8 @@ await run([path.join(API_DIST, 'seed', 'seed.js')], { env });
 
 const children = [
   spawn(process.execPath, [TSC, '-b', '-w', '--preserveWatchOutput', 'apps/api'], { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'], env: { ...process.env, ...env } }),
-  spawn(process.execPath, ['--watch', path.join(API_DIST, 'main.js')], { cwd: ROOT, stdio: 'inherit', env: { ...process.env, ...env } }),
+  // Watch only the compiled API: plain --watch also restarts when node_modules files are first loaded.
+  spawn(process.execPath, ['--watch-path', API_DIST, path.join(API_DIST, 'main.js')], { cwd: ROOT, stdio: 'inherit', env: { ...process.env, ...env } }),
   spawn(process.execPath, [VITE], { cwd: path.join(ROOT, 'apps', 'web'), stdio: 'inherit', env: { ...process.env, ...env } }),
 ];
 // Only surface compiler errors from the watcher.

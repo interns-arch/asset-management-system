@@ -22,12 +22,22 @@ and loads demo data.
 | it@acme.test        | IT / Asset Manager  | `Demo@1234` |
 | hr@acme.test        | HR                  | `Demo@1234` |
 | manager@acme.test   | Manager             | `Demo@1234` |
-| rahul@acme.test     | Employee            | `Demo@1234` |
+| rahul@acme.test     | Employee (view only)| `Demo@1234` |
+| ACM1099             | Employee, no email — signs in with employee ID | `Demo@1234` |
 
 Try the exit flow: sign in as **HR**, open *Employees → Rahul Sharma → Change status → Notice
 period*. His 7 assets (laptop, charger, SIM, access card, scooty, helmet, keys) land on a recovery
 checklist and IT is notified. Sign in as **IT** to scan them back; the exit stays blocked until
 every item is cleared or HR records an override with a reason.
+
+**One QR per person.** Every employee's QR holds just their employee ID (e.g. `CT000099`).
+IT prints ID cards (*Employees → select → Print ID cards*) or the employee shows *My QR* on their
+phone. IT taps **Scan**, scans it, and sees the person with everything assigned to them — then
+can assign, return, or tap **Mark checked** (your register's "last checked on").
+
+**Logins.** On a person's page IT taps **Give login (view only)**; a password is generated to
+copy or share. The person signs in with their **employee ID** (or email if they have one) and
+only sees their own assets and QR. The IT role has full access.
 
 ## Scripts
 
@@ -70,8 +80,8 @@ every item is cleared or HR records an override with a reason.
   Department, Location, Vendor, Request, Ticket, Maintenance.
 - **Requests, tickets, maintenance** — request → approve → fulfil (assigns the asset);
   tickets against assets; maintenance moves an asset into and back out of service.
-- **Roles & permissions** — Admin, IT / Asset Manager, HR, Manager, Employee (self-service),
-  all editable. Employees only see the assets they hold.
+- **Roles & permissions** — Admin and IT / Asset Manager (full access), HR, Manager, and
+  Employee (view only: their own assets and QR, plus requests and tickets). All editable.
 
 ## Architecture
 
