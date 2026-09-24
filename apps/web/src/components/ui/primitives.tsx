@@ -6,7 +6,7 @@ import { cn, initials } from '@/lib/utils';
 
 // ─── Card ─────────────────────────────────────────────────────────────────
 export function Card({ className, ...props }: React.ComponentProps<'div'>) {
-  return <div data-slot="card" className={cn('rounded-xl border bg-card text-card-foreground shadow-xs', className)} {...props} />;
+  return <div data-slot="card" className={cn('rounded-xl border bg-card text-card-foreground shadow-[0_1px_3px_0_rgb(0_0_0/0.04),0_1px_2px_-1px_rgb(0_0_0/0.03)]', className)} {...props} />;
 }
 export function CardHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return <div className={cn('flex items-start justify-between gap-3 px-5 pt-4 pb-3', className)} {...props} />;

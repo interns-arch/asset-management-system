@@ -262,14 +262,18 @@ export const exitCancelSchema = z.object({ reason: optText(1000) });
 export const exitScanSchema = z.object({ code: reqText(300) });
 
 // ─── Requests / tickets / maintenance ───────────────────────────────────────
-export const requestSchema = z.object({
-  employeeId: optId,
-  assetTypeId: reqId,
-  quantity: z.coerce.number().int().min(1).max(1000).default(1),
-  priority: z.enum(PRIORITIES).default('MEDIUM'),
-  neededBy: optDate,
-  reason: reqText(2000),
-});
+/** Request a catalog type, or describe anything else in your own words. */
+export const requestSchema = z
+  .object({
+    employeeId: optId,
+    assetTypeId: optId,
+    itemName: optText(150),
+    quantity: z.coerce.number().int().min(1).max(1000).default(1),
+    priority: z.enum(PRIORITIES).default('MEDIUM'),
+    neededBy: optDate,
+    reason: reqText(2000),
+  })
+  .refine((v) => !!v.assetTypeId || !!v.itemName, { message: 'Choose what you need or type it', path: ['assetTypeId'] });
 export const requestDecisionSchema = z.object({
   decision: z.enum(['APPROVE', 'REJECT']),
   note: optText(1000),

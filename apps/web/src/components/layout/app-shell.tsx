@@ -26,6 +26,7 @@ import { useQuickAdd } from '@/features/quick-add/quick-add';
 import { api, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useHotkeys, useScannerInput } from '@/lib/hotkeys';
+import { useCompanyName } from '@/lib/config';
 import { resolveCode } from '@/lib/scan';
 import { cn } from '@/lib/utils';
 import { CommandPalette } from './command-palette';
@@ -48,6 +49,7 @@ function useTheme() {
 }
 
 function Brand() {
+  const company = useCompanyName();
   return (
     <div className="flex items-center gap-2.5 px-2">
       <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm shadow-primary/30">
@@ -56,8 +58,8 @@ function Brand() {
         </svg>
       </span>
       <span className="leading-tight">
-        <span className="block text-sm font-semibold">Asset Portal</span>
-        <span className="block text-[11px] text-muted-foreground">Enterprise asset management</span>
+        <span className="block truncate text-sm font-semibold">{company.short ?? 'Asset Portal'}</span>
+        <span className="block text-[11px] text-muted-foreground">{company.short ? 'Asset Portal' : 'Enterprise asset management'}</span>
       </span>
     </div>
   );
@@ -79,7 +81,7 @@ function NavSection({ title, items, onNavigate }: { title?: string; items: NavIt
           className={({ isActive }) =>
             cn(
               'group flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-sidebar-foreground/80 transition hover:bg-sidebar-accent hover:text-foreground',
-              isActive && 'bg-sidebar-accent text-foreground [&_svg]:text-primary',
+              isActive && 'bg-primary/10 font-semibold text-primary [&_svg]:text-primary',
             )
           }
         >

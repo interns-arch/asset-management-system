@@ -95,7 +95,7 @@ export default function RequestsPage() {
           <EnumBadge value={r.status} tones={REQUEST_TONE} />
           {r.status === 'FULFILLED' && r.fulfilledAssetTag && <span className="font-mono text-[11px] text-muted-foreground">{r.fulfilledAssetTag}</span>}
           {(r.status === 'PENDING' || r.status === 'APPROVED') && (
-            <span className={cn('text-[11px]', r.availableCount ? 'text-emerald-600' : 'text-red-600')}>{r.availableCount} in stock</span>
+            <span className={cn('text-[11px]', r.custom ? 'text-muted-foreground' : r.availableCount ? 'text-emerald-600' : 'text-red-600')}>{r.custom ? 'Not in catalog' : `${r.availableCount} in stock`}</span>
           )}
         </div>
       ),
@@ -213,12 +213,12 @@ function FulfilDialog({ request, onClose }: { request: AssetRequest | null; onCl
         <DialogHeader>
           <DialogTitle>Fulfil {request?.number}</DialogTitle>
           <DialogDescription>
-            Pick an available {request?.typeName} for {request?.employeeName}. It will be assigned to them immediately.
+            Pick {request?.custom ? 'any asset that matches' : `an available ${request?.typeName}`} for {request?.employeeName}. It will be assigned to them immediately.
           </DialogDescription>
         </DialogHeader>
         {request && (
           <Field label="Asset">
-            <EntityPicker kind="asset" value={assetId} onChange={setAssetId} assetFilter={{ assetTypeId: request.assetTypeId, status: 'AVAILABLE,IN_INVENTORY' }} />
+            <EntityPicker kind="asset" value={assetId} onChange={setAssetId} assetFilter={{ assetTypeId: request.assetTypeId ?? undefined, status: 'AVAILABLE,IN_INVENTORY' }} />
           </Field>
         )}
         <DialogFooter>

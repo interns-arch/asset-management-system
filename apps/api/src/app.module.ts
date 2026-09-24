@@ -1,8 +1,9 @@
 import { Controller, Get, Module } from '@nestjs/common';
-import { sql } from 'drizzle-orm';
+import { asc, sql } from 'drizzle-orm';
 import { Public } from './common/http';
 import { CoreModule } from './core/core.module';
 import { DbService } from './db/db.service';
+import { companies } from './db/schema';
 import { AdminModule } from './modules/admin/admin.module';
 import { AssetsModule } from './modules/assets/assets.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -27,11 +28,14 @@ export class HealthController {
 
 @Controller('config')
 export class ConfigController {
-  /** Base URL printed into QR codes, so a phone's camera can open them. */
+  constructor(private readonly dbs: DbService) {}
+
+  /** Public app settings: the address printed into QR codes and the company shown on screens. */
   @Public()
   @Get()
-  config() {
-    return { publicUrl: process.env.PUBLIC_URL?.replace(/\/+$/, '') || null };
+  async config() {
+    const [company] = await this.dbs.db.select({ name: companies.name }).from(companies).orderBy(asc(companies.createdAt)).limit(1);
+    return { publicUrl: process.env.PUBLIC_URL?.replace(/\/+$/, '') || null, companyName: company?.name ?? null };
   }
 }
 

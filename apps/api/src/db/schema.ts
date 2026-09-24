@@ -494,9 +494,9 @@ export const assetRequests = pgTable(
       .references(() => employees.id),
     requestedBy: uuid('requested_by'),
     requestedByName: text('requested_by_name'),
-    assetTypeId: uuid('asset_type_id')
-      .notNull()
-      .references(() => assetTypes.id),
+    // A catalog type, or — for anything not in the catalog — a free-text item name.
+    assetTypeId: uuid('asset_type_id').references(() => assetTypes.id),
+    itemName: text('item_name'),
     quantity: integer('quantity').notNull().default(1),
     priority: text('priority', { enum: PRIORITIES }).notNull().default('MEDIUM'),
     neededBy: date('needed_by', { mode: 'string' }),

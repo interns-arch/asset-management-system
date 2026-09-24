@@ -51,7 +51,7 @@ export default function AssetForm({ open, onOpenChange, record, defaults }: Form
   const schema = useMemo(() => (editing ? assetUpdateSchema : assetCreateSchema).extend({ attributes: buildAttributesSchema(fields) }), [editing, fields]);
 
   const form = useZodForm(schema, {
-    name: asset?.name ?? '',
+    name: asset?.name ?? defaults?.name ?? '',
     status: 'AVAILABLE',
     condition: asset?.condition ?? 'NEW',
     quantity: asset?.quantity ?? 1,
@@ -90,7 +90,7 @@ export default function AssetForm({ open, onOpenChange, record, defaults }: Form
   const manufacturer = form.watch('manufacturer');
   const model = form.watch('model');
   useEffect(() => {
-    if (editing || form.getFieldState('name').isDirty) return;
+    if (editing || defaults?.name || form.getFieldState('name').isDirty) return;
     const suggestion = [manufacturer, model].filter(Boolean).join(' ').trim();
     if (suggestion) form.setValue('name', suggestion);
   }, [manufacturer, model, editing, form]);
@@ -153,7 +153,7 @@ export default function AssetForm({ open, onOpenChange, record, defaults }: Form
       onOpenChange={onOpenChange}
       size="lg"
       title={editing ? `Edit ${asset.assetTag}` : 'Add asset'}
-      description={editing ? asset.name : 'Anything the company owns, leases, stores or uses.'}
+      description={editing ? asset.name : defaults?.holderLabel ? `It will be assigned to ${defaults.holderLabel}.` : 'Anything the company owns, leases, stores or uses.'}
       onSubmit={submit(false)}
       submitting={save.isPending}
       submitLabel={editing ? 'Save changes' : 'Add asset'}
@@ -304,6 +304,7 @@ export default function AssetForm({ open, onOpenChange, record, defaults }: Form
                     <HolderPicker
                       holderType={holderType}
                       holderId={holderId}
+                      selectedLabel={holderId === defaults?.holderId ? defaults?.holderLabel : undefined}
                       allowed={pooled ? ['EMPLOYEE', 'DEPARTMENT', 'LOCATION', 'COMPANY', 'VENDOR'] : undefined}
                       invalid={!!holderError}
                       onChange={(t, id) => {

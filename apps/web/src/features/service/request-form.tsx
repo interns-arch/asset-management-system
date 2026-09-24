@@ -18,6 +18,7 @@ export default function RequestForm({ open, onOpenChange, defaults }: FormProps)
   const form = useZodForm(requestSchema, {
     employeeId: defaults?.employeeId ?? me?.employee?.id ?? '',
     assetTypeId: defaults?.assetTypeId ?? '',
+    itemName: '',
     quantity: 1,
     priority: 'MEDIUM',
     neededBy: '',
@@ -29,7 +30,7 @@ export default function RequestForm({ open, onOpenChange, defaults }: FormProps)
   const submit = form.handleSubmit(async (values) => {
     try {
       const r = await save.mutateAsync(values);
-      await queryClient.invalidateQueries({ queryKey: ['requests'] });
+      await Promise.all([queryClient.invalidateQueries({ queryKey: ['requests'] }), queryClient.invalidateQueries({ queryKey: ['dashboard'] })]);
       toast.success(`Request ${r.number} submitted`, { description: 'Approvers have been notified.' });
       onOpenChange(false);
     } catch (err) {
@@ -39,17 +40,29 @@ export default function RequestForm({ open, onOpenChange, defaults }: FormProps)
   });
 
   return (
-    <FormSheet open={open} onOpenChange={onOpenChange} size="sm" title="Request an asset" description="Ask for equipment, a licence, a vehicle — anything in the catalog." onSubmit={submit} submitting={save.isPending} submitLabel="Submit request">
+    <FormSheet open={open} onOpenChange={onOpenChange} size="sm" title="Request an asset" description="Ask for anything you need for work — IT will be notified." onSubmit={submit} submitting={save.isPending} submitLabel="Submit request">
       <div className="grid gap-4">
         {forOthers && (
           <Field label="For employee" required error={e('employeeId')}>
             <EntityPicker kind="EMPLOYEE" value={(form.watch('employeeId') as string) || null} selectedLabel={me?.employee?.fullName} onChange={(v) => form.setValue('employeeId', v ?? '')} />
           </Field>
         )}
-        <Field label="What do you need?" required error={e('assetTypeId')}>
+        <Field label="What do you need?" required error={e('assetTypeId')} hint="Pick from the list, or type anything and tap “Request …”">
           <Combobox
-            value={(form.watch('assetTypeId') as string) || null}
-            onChange={(v) => form.setValue('assetTypeId', v ?? '', { shouldValidate: true })}
+            value={(form.watch('assetTypeId') as string) || (form.watch('itemName') ? '__custom__' : null)}
+            selectedLabel={(form.watch('itemName') as string) || null}
+            onChange={(v) => {
+              form.setValue('itemName', '');
+              form.setValue('assetTypeId', v ?? '', { shouldValidate: true });
+            }}
+            onCreate={(text) => {
+              if (!text) return;
+              form.setValue('assetTypeId', '');
+              form.setValue('itemName', text, { shouldValidate: true });
+              form.clearErrors('assetTypeId');
+            }}
+            createWithoutText={false}
+            createLabel={(t) => `Request “${t}”`}
             options={(types.data ?? []).map((t) => ({
               value: t.id,
               label: t.name,

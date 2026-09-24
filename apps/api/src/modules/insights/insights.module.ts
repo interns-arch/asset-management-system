@@ -213,12 +213,20 @@ export class DashboardService {
     const [requests, myTickets, exit] = await Promise.all([
       actor.employeeId
         ? db
-            .select({ id: assetRequests.id, number: assetRequests.number, status: assetRequests.status, createdAt: assetRequests.createdAt, typeName: assetTypes.name })
+            .select({
+              id: assetRequests.id,
+              number: assetRequests.number,
+              status: assetRequests.status,
+              createdAt: assetRequests.createdAt,
+              quantity: assetRequests.quantity,
+              decisionNote: assetRequests.decisionNote,
+              typeName: sql<string>`coalesce(${assetTypes.name}, ${assetRequests.itemName})`,
+            })
             .from(assetRequests)
-            .innerJoin(assetTypes, eq(assetTypes.id, assetRequests.assetTypeId))
+            .leftJoin(assetTypes, eq(assetTypes.id, assetRequests.assetTypeId))
             .where(eq(assetRequests.employeeId, actor.employeeId))
             .orderBy(desc(assetRequests.createdAt))
-            .limit(5)
+            .limit(10)
         : [],
       db
         .select({ id: tickets.id, number: tickets.number, title: tickets.title, status: tickets.status, createdAt: tickets.createdAt })

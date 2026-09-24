@@ -168,6 +168,21 @@ describe('one QR per person and view-only logins', () => {
     assert.equal((await call('GET', '/auth/me', undefined, 'anurag')).status, 401);
   });
 
+  test('an employee can request something that is not in the catalog', async () => {
+    const r = await call('POST', '/requests', { itemName: 'Ergonomic footrest', reason: 'Back pain' }, 'bob');
+    assert.equal(r.status, 201);
+    assert.equal(r.body.assetTypeId, null);
+    assert.equal((await call('POST', '/requests', { reason: 'Nothing chosen' }, 'bob')).status, 400);
+    const mine = await call('GET', '/requests', undefined, 'bob');
+    const row = mine.body.items.find((x: { id: string }) => x.id === r.body.id);
+    assert.equal(row.typeName, 'Ergonomic footrest');
+    assert.equal(row.custom, true);
+    // IT approves and fulfils it with any asset.
+    assert.equal((await call('POST', `/requests/${r.body.id}/decision`, { decision: 'APPROVE' }, 'it')).status, 200);
+    const drone = await newDrone({ name: 'Footrest stand-in' });
+    assert.equal((await call('POST', `/requests/${r.body.id}/fulfil`, { assetId: drone.body.id }, 'it')).status, 200);
+  });
+
   test('IT records that a person still has their assets', async () => {
     const r = await call('POST', `/employees/${ids.bob}/verify-assets`, { note: 'Checked at desk' }, 'it');
     assert.equal(r.status, 200);

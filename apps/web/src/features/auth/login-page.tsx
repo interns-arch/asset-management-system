@@ -8,14 +8,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { api, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { useCompanyName } from '@/lib/config';
 
 const DEMO = [
-  { email: 'admin@acme.test', role: 'Admin' },
-  { email: 'it@acme.test', role: 'IT / Asset manager' },
-  { email: 'hr@acme.test', role: 'HR' },
-  { email: 'manager@acme.test', role: 'Manager' },
-  { email: 'rahul@acme.test', role: 'Employee (view only)' },
-  { email: 'ACM1099', role: 'Employee ID, no email' },
+  { email: 'admin@cartrend.test', role: 'Admin' },
+  { email: 'it@cartrend.test', role: 'IT / Asset manager' },
+  { email: 'hr@cartrend.test', role: 'HR' },
+  { email: 'manager@cartrend.test', role: 'Manager' },
+  { email: 'rahul@cartrend.test', role: 'Employee (view only)' },
+  { email: 'CT000099', role: 'Employee ID, no email' },
 ];
 
 export default function LoginPage() {
@@ -26,6 +27,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const form = useZodForm(loginSchema, { login: '', password: '' });
   const next = params.get('next') || '/';
+  const company = useCompanyName();
 
   if (me) return <Navigate to={next} replace />;
 
@@ -53,7 +55,10 @@ export default function LoginPage() {
               <path d="M9 22 16 8l7 14M11.8 17h8.4" />
             </svg>
           </span>
-          <span className="text-lg font-semibold">Asset Portal</span>
+          <span className="leading-tight">
+            <span className="block text-lg font-semibold">{company.full ?? 'Asset Portal'}</span>
+            {company.full && <span className="block text-xs text-indigo-100">Asset Portal</span>}
+          </span>
         </div>
         <div className="relative mt-auto max-w-lg">
           <h1 className="text-4xl font-semibold leading-tight tracking-tight">Every asset your company owns, in one place.</h1>
@@ -78,6 +83,17 @@ export default function LoginPage() {
 
       <div className="flex min-w-0 items-center justify-center p-6 sm:p-10">
         <div className="w-full min-w-0 max-w-sm">
+          <div className="mb-6 flex items-center gap-2.5 lg:hidden">
+            <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <svg viewBox="0 0 32 32" className="size-5" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 22 16 8l7 14M11.8 17h8.4" />
+              </svg>
+            </span>
+            <span className="leading-tight">
+              <span className="block font-semibold">{company.short ?? 'Asset Portal'}</span>
+              <span className="block text-xs text-muted-foreground">Asset Portal</span>
+            </span>
+          </div>
           <h2 className="text-2xl font-semibold tracking-tight">Sign in</h2>
           <p className="mt-1 text-sm text-muted-foreground">Use your employee ID (e.g. CT000099) or work email.</p>
           {(next.startsWith('/id/') || next.startsWith('/scan/')) && (

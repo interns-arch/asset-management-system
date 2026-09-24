@@ -12,6 +12,7 @@ import {
   MoreHorizontal,
   Pencil,
   Phone,
+  Plus,
   Printer,
   Share2,
   ShieldOff,
@@ -46,6 +47,7 @@ import { AssetActionDialog, type AssetDialog } from '@/features/assets/asset-act
 import { useQuickAdd } from '@/features/quick-add/quick-add';
 import { api, errorMessage, type Page } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { useCompanyName } from '@/lib/config';
 import { AssetIcon } from '@/lib/icons';
 import { invalidateAssetData, queryClient } from '@/lib/queries';
 import { EXIT_CASE_TONE } from '@/lib/status';
@@ -352,6 +354,12 @@ export default function EmployeeDetailPage() {
       <PickAssetDialog
         open={pickAsset}
         onOpenChange={setPickAsset}
+        personName={e.fullName}
+        onAddNew={(name) => {
+          setPickAsset(false);
+          // Let the dialog close before the form opens (both are modal).
+          setTimeout(() => quickAdd.open('asset', { defaults: { holderType: 'EMPLOYEE', holderId: e.id, holderLabel: `${e.fullName} (${e.employeeCode})`, name: name || undefined } }), 150);
+        }}
         onPick={(a) => {
           setPickAsset(false);
           setDialog({
@@ -488,8 +496,10 @@ interface Credentials {
 
 /** Shown once after giving a login: IT copies or shares it (e.g. on WhatsApp). */
 function CredentialsDialog({ employee, credentials, onClose }: { employee: EmployeeDetail; credentials: Credentials | null; onClose: () => void }) {
+  const company = useCompanyName();
+  const links = useQrLinks();
   const text = credentials
-    ? `Asset Portal login for ${employee.fullName}\n${window.location.origin}\nEmployee ID: ${credentials.loginId}\nPassword: ${credentials.password}\nPlease change your password after signing in.`
+    ? `${company.short ?? 'Asset Portal'} — asset portal login for ${employee.fullName}\n${links.base}\nEmployee ID: ${credentials.loginId}\nPassword: ${credentials.password}\nPlease change your password after signing in.`
     : '';
   const copy = async () => {
     try {
@@ -542,25 +552,54 @@ function CredentialsDialog({ employee, credentials, onClose }: { employee: Emplo
 }
 
 /** Step 1 of "Assign asset" from a person: choose an available asset. */
-function PickAssetDialog({ open, onOpenChange, onPick }: { open: boolean; onOpenChange: (o: boolean) => void; onPick: (a: AssetListItem) => void }) {
+function PickAssetDialog({
+  open,
+  onOpenChange,
+  onPick,
+  onAddNew,
+  personName,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  onPick: (a: AssetListItem) => void;
+  onAddNew: (name: string) => void;
+  personName: string;
+}) {
+  const { can } = useAuth();
   const [value, setValue] = useState<string | null>(null);
   const [picked, setPicked] = useState<AssetListItem | null>(null);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Assign an asset</DialogTitle>
-          <DialogDescription>Choose an available asset (or one in a store).</DialogDescription>
+          <DialogTitle>Assign an asset to {personName}</DialogTitle>
+          <DialogDescription>Pick one that’s available or in a store — or add a new one that isn’t in the system yet.</DialogDescription>
         </DialogHeader>
         <EntityPicker
           kind="asset"
           value={value}
           assetFilter={{ status: 'AVAILABLE,IN_INVENTORY' }}
+          onAddNew={can('asset:create') ? onAddNew : undefined}
           onChange={async (v) => {
             setValue(v);
             setPicked(v ? await api.get<AssetListItem>(`/assets/${v}`) : null);
           }}
         />
+        {can('asset:create') && (
+          <button
+            type="button"
+            onClick={() => onAddNew('')}
+            className="flex w-full cursor-pointer items-center gap-3 rounded-xl border border-dashed border-primary/40 p-3 text-left transition hover:bg-primary/5"
+          >
+            <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Plus className="size-4" />
+            </span>
+            <span>
+              <span className="block text-sm font-medium">Add a new asset</span>
+              <span className="block text-xs text-muted-foreground">Enter its details and it’s assigned to {personName} right away</span>
+            </span>
+          </button>
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel

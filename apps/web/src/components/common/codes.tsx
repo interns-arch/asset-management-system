@@ -1,8 +1,7 @@
 import JsBarcode from 'jsbarcode';
 import QRCodeLib from 'qrcode';
 import { useEffect, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { useAppConfig } from '@/lib/config';
 import { cn } from '@/lib/utils';
 
 /**
@@ -11,12 +10,7 @@ import { cn } from '@/lib/utils';
  * The base is the server's public/LAN address, because a phone can't open "localhost".
  */
 export function useQrLinks() {
-  const q = useQuery({
-    queryKey: ['config'],
-    queryFn: () => api.get<{ publicUrl: string | null }>('/config'),
-    staleTime: Infinity,
-    placeholderData: undefined,
-  });
+  const q = useAppConfig();
   const base = q.data?.publicUrl || window.location.origin;
   const host = new URL(base).hostname;
   return {

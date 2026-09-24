@@ -18,12 +18,12 @@ and loads demo data.
 
 | Demo account        | Role                | Password    |
 | ------------------- | ------------------- | ----------- |
-| admin@acme.test     | Admin               | `Demo@1234` |
-| it@acme.test        | IT / Asset Manager  | `Demo@1234` |
-| hr@acme.test        | HR                  | `Demo@1234` |
-| manager@acme.test   | Manager             | `Demo@1234` |
-| rahul@acme.test     | Employee (view only)| `Demo@1234` |
-| ACM1099             | Employee, no email — signs in with employee ID | `Demo@1234` |
+| admin@cartrend.test     | Admin               | `Demo@1234` |
+| it@cartrend.test        | IT / Asset Manager  | `Demo@1234` |
+| hr@cartrend.test        | HR                  | `Demo@1234` |
+| manager@cartrend.test   | Manager             | `Demo@1234` |
+| rahul@cartrend.test     | Employee (view only)| `Demo@1234` |
+| CT000099             | Employee, no email — signs in with employee ID | `Demo@1234` |
 
 Try the exit flow: sign in as **HR**, open *Employees → Rahul Sharma → Change status → Notice
 period*. His 7 assets (laptop, charger, SIM, access card, scooty, helmet, keys) land on a recovery

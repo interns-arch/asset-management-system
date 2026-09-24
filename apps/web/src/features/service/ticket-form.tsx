@@ -23,7 +23,7 @@ export default function TicketForm({ open, onOpenChange, defaults }: FormProps) 
   const submit = form.handleSubmit(async (values) => {
     try {
       const t = await save.mutateAsync(values);
-      await Promise.all([queryClient.invalidateQueries({ queryKey: ['tickets'] }), queryClient.invalidateQueries({ queryKey: ['history'] })]);
+      await Promise.all([queryClient.invalidateQueries({ queryKey: ['tickets'] }), queryClient.invalidateQueries({ queryKey: ['history'] }), queryClient.invalidateQueries({ queryKey: ['dashboard'] })]);
       toast.success(`Ticket ${t.number} raised`, { description: 'The support team has been notified.' });
       onOpenChange(false);
     } catch (err) {

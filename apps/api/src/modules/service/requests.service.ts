@@ -36,7 +36,7 @@ export class RequestsService {
     if (statuses.length) conds.push(inArray(assetRequests.status, statuses));
     if (p.search) {
       const like = likePattern(p.search);
-      conds.push(or(ilike(assetRequests.number, like), ilike(employees.fullName, like), ilike(assetTypes.name, like), ilike(assetRequests.reason, like))!);
+      conds.push(or(ilike(assetRequests.number, like), ilike(employees.fullName, like), ilike(assetTypes.name, like), ilike(assetRequests.itemName, like), ilike(assetRequests.reason, like))!);
     }
     const where = conds.length ? and(...conds) : undefined;
     const db = this.dbs.db;
@@ -47,7 +47,8 @@ export class RequestsService {
           employeeName: employees.fullName,
           employeeCode: employees.employeeCode,
           departmentName: departments.name,
-          typeName: assetTypes.name,
+          typeName: sql<string>`coalesce(${assetTypes.name}, ${assetRequests.itemName})`,
+          custom: sql<boolean>`${assetRequests.assetTypeId} is null`,
           typeIcon: assetTypes.icon,
           categoryName: assetCategories.name,
           fulfilledAssetTag: assets.assetTag,
@@ -56,8 +57,8 @@ export class RequestsService {
         .from(assetRequests)
         .innerJoin(employees, eq(employees.id, assetRequests.employeeId))
         .leftJoin(departments, eq(departments.id, employees.departmentId))
-        .innerJoin(assetTypes, eq(assetTypes.id, assetRequests.assetTypeId))
-        .innerJoin(assetCategories, eq(assetCategories.id, assetTypes.categoryId))
+        .leftJoin(assetTypes, eq(assetTypes.id, assetRequests.assetTypeId))
+        .leftJoin(assetCategories, eq(assetCategories.id, assetTypes.categoryId))
         .leftJoin(assets, eq(assets.id, assetRequests.fulfilledAssetId));
     const [rows, [{ total }]] = await Promise.all([
       base()
@@ -72,7 +73,7 @@ export class RequestsService {
         .select({ total: sql<number>`count(*)::int` })
         .from(assetRequests)
         .innerJoin(employees, eq(employees.id, assetRequests.employeeId))
-        .innerJoin(assetTypes, eq(assetTypes.id, assetRequests.assetTypeId))
+        .leftJoin(assetTypes, eq(assetTypes.id, assetRequests.assetTypeId))
         .where(where),
     ]);
     return { items: rows.map(({ request, ...rest }) => ({ ...request, ...rest })), total, page: p.page, pageSize: p.pageSize };
@@ -92,8 +93,12 @@ export class RequestsService {
       const [emp] = await db.select({ fullName: employees.fullName, status: employees.status }).from(employees).where(eq(employees.id, employeeId));
       if (!emp) throw badRequest('Employee not found', { employeeId: 'Not found' });
       if (emp.status === 'EXITED') throw badRequest(`${emp.fullName} has exited`);
-      const [type] = await db.select({ name: assetTypes.name }).from(assetTypes).where(eq(assetTypes.id, input.assetTypeId));
-      if (!type) throw badRequest('Asset type not found', { assetTypeId: 'Not found' });
+      let what = input.itemName ?? '';
+      if (input.assetTypeId) {
+        const [type] = await db.select({ name: assetTypes.name }).from(assetTypes).where(eq(assetTypes.id, input.assetTypeId));
+        if (!type) throw badRequest('Asset type not found', { assetTypeId: 'Not found' });
+        what = type.name;
+      }
       const number = await this.sequences.next('REQ', 5);
       const [row] = await db
         .insert(assetRequests)
@@ -104,12 +109,12 @@ export class RequestsService {
         entityId: row.id,
         entityLabel: number,
         action: 'CREATED',
-        summary: `${emp.fullName} requested ${input.quantity} × ${type.name}`,
+        summary: `${emp.fullName} requested ${input.quantity} × ${what}`,
         employeeId,
       });
       await this.notifications.notifyPermission(
         'request:approve',
-        { type: 'REQUEST_CREATED', title: `New request ${number}`, body: `${emp.fullName} needs ${input.quantity} × ${type.name}`, link: `/requests?open=${row.id}` },
+        { type: 'REQUEST_CREATED', title: `New request ${number}`, body: `${emp.fullName} needs ${input.quantity} × ${what}`, link: `/requests?open=${row.id}` },
         actor.userId,
       );
       return row;
@@ -159,7 +164,8 @@ export class RequestsService {
       if (r.status !== 'APPROVED') throw conflict(r.status === 'PENDING' ? 'Approve the request first.' : `This request is already ${r.status.toLowerCase()}.`);
       const [asset] = await db.select().from(assets).where(eq(assets.id, assetId));
       if (!asset) throw badRequest('Asset not found', { assetId: 'Not found' });
-      if (asset.assetTypeId !== r.assetTypeId) {
+      // A free-text request can be fulfilled with any asset; a catalog request needs that type.
+      if (r.assetTypeId && asset.assetTypeId !== r.assetTypeId) {
         const [type] = await db.select({ name: assetTypes.name }).from(assetTypes).where(eq(assetTypes.id, r.assetTypeId));
         throw badRequest(`Pick a ${type?.name ?? 'matching'} asset`, { assetId: 'Wrong asset type' });
       }

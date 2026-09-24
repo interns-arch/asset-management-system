@@ -87,7 +87,7 @@ async function main() {
   const passwordHash = await hashPassword(DEMO_PASSWORD);
   const [adminUser] = await dbs.root
     .insert(users)
-    .values({ email: 'admin@acme.test', name: 'Aditi Rao', passwordHash, roleId: roleIds.Admin })
+    .values({ email: 'admin@cartrend.test', name: 'Aditi Rao', passwordHash, roleId: roleIds.Admin })
     .returning();
   const admin: Actor = {
     userId: adminUser.id,
@@ -99,31 +99,38 @@ async function main() {
   };
 
   // ── Organisation ────────────────────────────────────────────────────────
-  const acme = (await org.create('companies', admin, { name: 'Acme Technologies Pvt Ltd', code: 'ACME', legalName: 'Acme Technologies Private Limited', address: 'Bandra Kurla Complex, Mumbai' })) as { id: string };
-  const logistics = (await org.create('companies', admin, { name: 'Acme Logistics LLP', code: 'ACMELOG', address: 'Chakan MIDC, Pune' })) as { id: string };
+  const acme = (await org.create('companies', admin, {
+    name: 'Cartrend Autoparts Pvt Ltd',
+    code: 'CARTREND',
+    legalName: 'Cartrend Autoparts Private Limited',
+    address: 'Near Old PO, Bijwasan, New Delhi 110061',
+  })) as { id: string };
+  // One company: the warehouse belongs to it too.
+  const logistics = acme;
 
   const loc = async (name: string, code: string, type: string, extra: Record<string, unknown> = {}) =>
     ((await org.create('locations', admin, { name, code, type, isStore: false, companyId: acme.id, ...extra })) as { id: string }).id;
-  const mumbai = await loc('Mumbai HQ', 'MUM-HQ', 'OFFICE', { address: 'BKC, Mumbai 400051' });
-  const mumbai3 = await loc('Mumbai HQ · Floor 3', 'MUM-F3', 'FLOOR', { parentId: mumbai });
-  const mumbai4 = await loc('Mumbai HQ · Floor 4', 'MUM-F4', 'FLOOR', { parentId: mumbai });
-  const itStore = await loc('IT Store Room', 'MUM-ITS', 'ROOM', { parentId: mumbai3, isStore: true });
-  const serverRoom = await loc('Server Room', 'MUM-SRV', 'ROOM', { parentId: mumbai4 });
-  const pune = await loc('Pune Warehouse', 'PUN-WH', 'WAREHOUSE', { companyId: logistics.id, isStore: true, address: 'Chakan MIDC, Pune 410501' });
-  const blr = await loc('Bengaluru Office', 'BLR', 'OFFICE', { address: 'Indiranagar, Bengaluru 560038' });
-  const parking = await loc('Mumbai HQ · Parking', 'MUM-PK', 'SITE', { parentId: mumbai });
-  const officeLocations = [mumbai3, mumbai4, blr];
+  const mumbai = await loc('Bijwasan HO', 'BJW-HO', 'OFFICE', { address: 'Near Old PO, Bijwasan, New Delhi 110061' });
+  const mumbai3 = await loc('Bijwasan HO · Ground Floor', 'BJW-GF', 'FLOOR', { parentId: mumbai });
+  const mumbai4 = await loc('Bijwasan HO · First Floor', 'BJW-FF', 'FLOOR', { parentId: mumbai });
+  const itStore = await loc('IT Store Room', 'BJW-ITS', 'ROOM', { parentId: mumbai3, isStore: true });
+  const serverRoom = await loc('Server Room', 'BJW-SRV', 'ROOM', { parentId: mumbai4 });
+  const pune = await loc('Bijwasan Warehouse', 'BJW-WH', 'WAREHOUSE', { isStore: true, address: 'Bijwasan, New Delhi 110061' });
+  const blr = await loc('Karol Bagh Branch', 'KB', 'OFFICE', { address: 'Karol Bagh, New Delhi 110005' });
+  const jaipur = await loc('Car Mall Jaipur', 'JPR', 'OFFICE', { address: 'Car Mall, Jaipur, Rajasthan' });
+  const parking = await loc('Bijwasan HO · Parking', 'BJW-PK', 'SITE', { parentId: mumbai });
+  const officeLocations = [mumbai3, mumbai4, blr, jaipur];
 
   const dept = async (name: string, code: string, companyId = acme.id) =>
     ((await org.create('departments', admin, { name, code, companyId })) as { id: string }).id;
   const depts = {
-    engineering: await dept('Engineering', 'ENG'),
-    sales: await dept('Sales', 'SAL'),
+    engineering: await dept('IT and Data', 'ITD'),
+    sales: await dept('Inside and Field Sales', 'SAL'),
     hr: await dept('Human Resources', 'HR'),
-    finance: await dept('Finance', 'FIN'),
-    it: await dept('IT', 'IT'),
+    finance: await dept('Accounts and Finance', 'FIN'),
+    it: await dept('IT Support', 'ITS'),
     operations: await dept('Operations', 'OPS'),
-    logistics: await dept('Logistics', 'LOG', logistics.id),
+    logistics: await dept('Warehouse', 'WH'),
   };
 
   const vendor = async (name: string, extra: Record<string, unknown> = {}) => ((await org.create('vendors', admin, { name, ...extra })) as { id: string }).id;
@@ -132,7 +139,7 @@ async function main() {
     apple: await vendor('Ingram Micro (Apple)', { contactName: 'Farah Khan', email: 'apple@ingram.example' }),
     hp: await vendor('HP India', { email: 'b2b@hp.example' }),
     lenovo: await vendor('Lenovo India', { email: 'sales@lenovo.example' }),
-    honda: await vendor('Honda 2Wheelers Dealer, Andheri', { phone: '+91 22 2600 1234' }),
+    honda: await vendor('Honda 2Wheelers, Dwarka', { phone: '+91 11 4500 1234' }),
     tata: await vendor('Tata Motors Fleet', { email: 'fleet@tata.example' }),
     airtel: await vendor('Airtel Business', { email: 'corporate@airtel.example' }),
     microsoft: await vendor('Microsoft India', { website: 'https://microsoft.com' }),
@@ -159,14 +166,14 @@ async function main() {
   }
 
   // ── Employees & logins ──────────────────────────────────────────────────
-  let code = 1000;
+  let code = 0;
   const emp = async (firstName: string, lastName: string, departmentId: string, designation: string, extra: Record<string, unknown> = {}) => {
     code += 1;
     const e = await employeesSvc.create(admin, {
-      employeeCode: `ACM${code}`,
+      employeeCode: `CT${pad(code, 6)}`,
       firstName,
       lastName,
-      email: `${firstName}.${lastName}`.toLowerCase().replace(/[^a-z.]/g, '') + '@acme.test',
+      email: `${firstName}.${lastName}`.toLowerCase().replace(/[^a-z.]/g, '') + '@cartrend.test',
       phone: `+91 9${int(100000000, 999999999)}`,
       personalPhone: `+91 ${pick(['6', '7', '8', '9'])}${int(100000000, 999999999)}`,
       personalEmail: `${firstName.toLowerCase()}${int(10, 99)}@gmail.test`,
@@ -185,26 +192,26 @@ async function main() {
   const vikram = await emp('Vikram', 'Singh', depts.it, 'IT Asset Manager', { locationId: mumbai3, managerId: aditi });
   const neha = await emp('Neha', 'Kapoor', depts.hr, 'HR Business Partner', { locationId: mumbai4 });
   const sanjay = await emp('Sanjay', 'Rao', depts.sales, 'Sales Manager', { locationId: mumbai3 });
-  const rahul = await emp('Rahul', 'Sharma', depts.sales, 'Senior Sales Executive', { locationId: mumbai3, managerId: sanjay, email: 'rahul.sharma@acme.test' });
+  const rahul = await emp('Rahul', 'Sharma', depts.sales, 'Senior Sales Executive', { locationId: mumbai3, managerId: sanjay, email: 'rahul.sharma@cartrend.test' });
   const karan = await emp('Karan', 'Malhotra', depts.engineering, 'Software Engineer', { locationId: blr });
 
   await dbs.root.update(users).set({ employeeId: aditi }).where(eq(users.id, adminUser.id));
   const login = (email: string, name: string, role: string, employeeId: string) =>
     dbs.root.insert(users).values({ email, name, passwordHash, roleId: roleIds[role], employeeId });
-  await login('it@acme.test', 'Vikram Singh', 'IT / Asset Manager', vikram);
-  await login('hr@acme.test', 'Neha Kapoor', 'HR', neha);
-  await login('manager@acme.test', 'Sanjay Rao', 'Manager', sanjay);
-  await login('rahul@acme.test', 'Rahul Sharma', 'Employee', rahul);
+  await login('it@cartrend.test', 'Vikram Singh', 'IT / Asset Manager', vikram);
+  await login('hr@cartrend.test', 'Neha Kapoor', 'HR', neha);
+  await login('manager@cartrend.test', 'Sanjay Rao', 'Manager', sanjay);
+  await login('rahul@cartrend.test', 'Rahul Sharma', 'Employee', rahul);
 
   const deptList = [depts.engineering, depts.engineering, depts.engineering, depts.sales, depts.sales, depts.finance, depts.operations, depts.hr, depts.it, depts.logistics];
   const designations: Record<string, string[]> = {
-    [depts.engineering]: ['Software Engineer', 'Senior Engineer', 'QA Engineer', 'DevOps Engineer', 'Product Designer'],
-    [depts.sales]: ['Sales Executive', 'Account Manager', 'Business Development Associate'],
-    [depts.finance]: ['Accountant', 'Finance Analyst'],
-    [depts.operations]: ['Operations Executive', 'Facilities Coordinator'],
+    [depts.engineering]: ['Full Stack Developer', 'Data Analyst', 'QA Engineer'],
+    [depts.sales]: ['Sales Executive', 'Field Sales Executive', 'CRM Leads', 'Inside Sales Executive'],
+    [depts.finance]: ['Account Executive', 'Accountant'],
+    [depts.operations]: ['Operations Executive', 'Picker and Packer'],
     [depts.hr]: ['HR Executive', 'Recruiter'],
     [depts.it]: ['IT Support Engineer', 'Network Engineer'],
-    [depts.logistics]: ['Warehouse Supervisor', 'Driver', 'Forklift Operator'],
+    [depts.logistics]: ['Warehouse Supervisor', 'Picker and Packer', 'Driver'],
   };
   const staff: string[] = [karan];
   const used = new Set(['Rahul Sharma', 'Karan Malhotra']);
@@ -302,11 +309,11 @@ async function main() {
   await laptop(toEmp(rahul), 0);
   await charger(toEmp(rahul), { serial: 'DL65W-RS-0412' });
   await add('SIM', 'Airtel Corporate SIM', { mobile_number: '+91 98201 45521', carrier: 'Airtel', plan: 'Corporate Unlimited 599', monthly_data_gb: 75 }, { holder: toEmp(rahul), vendorId: vendors.airtel, serial: '8991000900452211', cost: 0, ownership: 'SUBSCRIPTION' });
-  await add('ACC', 'Access Card — Mumbai HQ', { card_number: 'AC-MUM-30451', access_zones: ['Main Entrance', 'Office Floor', 'Parking'] }, { holder: toEmp(rahul), serial: null, cost: 350 });
+  await add('ACC', 'Access Card — Bijwasan HO', { card_number: 'AC-BJW-30451', access_zones: ['Main Entrance', 'Office Floor', 'Parking'] }, { holder: toEmp(rahul), serial: null, cost: 350 });
   await add(
     'SCT',
     'Honda Activa 6G',
-    { registration_no: 'MH-02-EK-4521', engine_no: 'JF50E-7210458', chassis_no: 'ME4JF50AMNT210458', fuel_type: 'Petrol', insurance_policy_no: 'ICICI-2W-88213', insurance_expiry: daysFromNow(140), puc_expiry: daysFromNow(60), engine_cc: 110 },
+    { registration_no: 'DL-02-EK-4521', engine_no: 'JF50E-7210458', chassis_no: 'ME4JF50AMNT210458', fuel_type: 'Petrol', insurance_policy_no: 'ICICI-2W-88213', insurance_expiry: daysFromNow(140), puc_expiry: daysFromNow(60), engine_cc: 110 },
     { holder: toEmp(rahul), vendorId: vendors.honda, manufacturer: 'Honda', model: 'Activa 6G', cost: 82000, serial: null, locationId: parking },
   );
   await add('HLM', 'Steelbird ISI Helmet', { size: 'L', isi_certified: true }, { holder: toEmp(rahul), vendorId: vendors.karam, cost: 1800, serial: null });
@@ -316,7 +323,7 @@ async function main() {
   await laptop(toEmp(karan), 2);
   await charger(toEmp(karan));
   await add('MON', 'Dell UltraSharp 27', { screen_size_inch: 27, resolution: '2560x1440', panel: 'IPS' }, { holder: toEmp(karan), vendorId: vendors.dell, manufacturer: 'Dell', model: 'U2723QE', cost: 42000 });
-  await add('ACC', 'Access Card — Bengaluru', { card_number: 'AC-BLR-11873', access_zones: ['Main Entrance', 'Office Floor'] }, { holder: toEmp(karan), serial: null, cost: 350 });
+  await add('ACC', 'Access Card — Karol Bagh', { card_number: 'AC-KB-11873', access_zones: ['Main Entrance', 'Office Floor'] }, { holder: toEmp(karan), serial: null, cost: 350 });
 
   // Leadership & IT.
   for (const id of [aditi, vikram, neha, sanjay]) {
@@ -361,12 +368,12 @@ async function main() {
   await add('POS', 'Pine Labs Plutus Smart', { terminal_id: 'PL-MUM-00921', acquiring_bank: 'HDFC Bank' }, { holder: { holderType: 'LOCATION', holderId: mumbai }, cost: 0, ownership: 'RENTED' });
   await add('SCN', 'Zebra DS2208 Barcode Scanner', { scanner_type: 'Handheld barcode' }, { holder: { holderType: 'LOCATION', holderId: pune }, cost: 7500 });
 
-  await add('CAR', 'Toyota Innova Crysta', { registration_no: 'MH-01-DX-7788', engine_no: '2GD-4418821', chassis_no: 'MBJ11JV4007712', fuel_type: 'Diesel', insurance_policy_no: 'HDFC-CAR-55120', insurance_expiry: daysFromNow(22), puc_expiry: daysFromNow(90), seating_capacity: 7 }, { holder: { holderType: 'COMPANY', holderId: acme.id }, cost: 2450000, locationId: parking, manufacturer: 'Toyota', model: 'Innova Crysta', serial: null });
-  await add('CAR', 'Maruti Suzuki Ciaz', { registration_no: 'MH-02-FB-1290', fuel_type: 'Petrol', insurance_expiry: daysFromNow(210), seating_capacity: 5 }, { holder: toEmp(sanjay), cost: 1100000, locationId: parking, serial: null });
-  await add('BIK', 'Bajaj Pulsar 150', { registration_no: 'MH-12-KT-3301', fuel_type: 'Petrol', insurance_expiry: daysFromNow(300), engine_cc: 150 }, { holder: toEmp(staff[5]), cost: 115000, serial: null });
-  await add('SCT', 'TVS Jupiter', { registration_no: 'MH-02-EZ-8812', fuel_type: 'Petrol', insurance_expiry: daysFromNow(95), engine_cc: 110 }, { cost: 78000, serial: null, locationId: parking });
-  await add('VAN', 'Tata Winger', { registration_no: 'MH-14-GU-4410', fuel_type: 'Diesel', insurance_expiry: daysFromNow(45), seating_capacity: 12 }, { holder: { holderType: 'COMPANY', holderId: logistics.id }, vendorId: vendors.tata, ownerCompanyId: logistics.id, cost: 1650000, locationId: pune, serial: null });
-  await add('TRK', 'Tata Ultra T.7', { registration_no: 'MH-14-HB-0092', fuel_type: 'Diesel', insurance_expiry: daysFromNow(12), load_capacity_t: 7 }, { holder: { holderType: 'DEPARTMENT', holderId: depts.logistics }, vendorId: vendors.tata, ownerCompanyId: logistics.id, cost: 2100000, locationId: pune, serial: null, ownership: 'LEASED' });
+  await add('CAR', 'Toyota Innova Crysta', { registration_no: 'DL-01-DX-7788', engine_no: '2GD-4418821', chassis_no: 'MBJ11JV4007712', fuel_type: 'Diesel', insurance_policy_no: 'HDFC-CAR-55120', insurance_expiry: daysFromNow(22), puc_expiry: daysFromNow(90), seating_capacity: 7 }, { holder: { holderType: 'COMPANY', holderId: acme.id }, cost: 2450000, locationId: parking, manufacturer: 'Toyota', model: 'Innova Crysta', serial: null });
+  await add('CAR', 'Maruti Suzuki Ciaz', { registration_no: 'DL-02-FB-1290', fuel_type: 'Petrol', insurance_expiry: daysFromNow(210), seating_capacity: 5 }, { holder: toEmp(sanjay), cost: 1100000, locationId: parking, serial: null });
+  await add('BIK', 'Bajaj Pulsar 150', { registration_no: 'DL-12-KT-3301', fuel_type: 'Petrol', insurance_expiry: daysFromNow(300), engine_cc: 150 }, { holder: toEmp(staff[5]), cost: 115000, serial: null });
+  await add('SCT', 'TVS Jupiter', { registration_no: 'DL-02-EZ-8812', fuel_type: 'Petrol', insurance_expiry: daysFromNow(95), engine_cc: 110 }, { cost: 78000, serial: null, locationId: parking });
+  await add('VAN', 'Tata Winger', { registration_no: 'DL-14-GU-4410', fuel_type: 'Diesel', insurance_expiry: daysFromNow(45), seating_capacity: 12 }, { holder: { holderType: 'COMPANY', holderId: logistics.id }, vendorId: vendors.tata, ownerCompanyId: logistics.id, cost: 1650000, locationId: pune, serial: null });
+  await add('TRK', 'Tata Ultra T.7', { registration_no: 'DL-14-HB-0092', fuel_type: 'Diesel', insurance_expiry: daysFromNow(12), load_capacity_t: 7 }, { holder: { holderType: 'DEPARTMENT', holderId: depts.logistics }, vendorId: vendors.tata, ownerCompanyId: logistics.id, cost: 2100000, locationId: pune, serial: null, ownership: 'LEASED' });
   await add('FLT', 'Godrej GX 300 Electric Forklift', { fuel_type: 'Electric', lift_capacity_kg: 2500 }, { holder: { holderType: 'LOCATION', holderId: pune }, ownerCompanyId: logistics.id, cost: 1350000 });
 
   await add('MCH', 'Industrial Shrink Wrapping Machine', { power_kw: 7.5, next_service: daysFromNow(18) }, { holder: { holderType: 'LOCATION', holderId: pune }, ownerCompanyId: logistics.id, cost: 450000 });
@@ -389,11 +396,11 @@ async function main() {
   await add('CAB', 'Godrej Steel Cabinet', { drawers: 4, lockable: true }, { holder: { holderType: 'DEPARTMENT', holderId: depts.hr }, vendorId: vendors.godrej, cost: 16000, serial: null });
   await add('KEY', 'Server Room Key', { key_number: 'K-4-SRV-01', opens: 'Server room, Floor 4', copies_issued: 2 }, { holder: toEmp(vikram), serial: null, cost: 0 });
 
-  await add('DOM', 'acme.test', { domain_name: 'acme.test', registrar: 'GoDaddy', domain_expiry: daysFromNow(64), auto_renew: true }, { serial: null, cost: 1200, ownership: 'SUBSCRIPTION', warrantyDays: 64 });
-  await add('CLD', 'AWS Production Account', { provider: 'AWS', account_id: '4821-0093-1172', owner_email: 'cloud@acme.test', console_url: 'https://console.aws.amazon.com' }, { holder: { holderType: 'DEPARTMENT', holderId: depts.engineering }, serial: null, cost: 0, ownership: 'SUBSCRIPTION' });
+  await add('DOM', 'cartrends.in', { domain_name: 'cartrends.in', registrar: 'GoDaddy', domain_expiry: daysFromNow(64), auto_renew: true }, { serial: null, cost: 1200, ownership: 'SUBSCRIPTION', warrantyDays: 64 });
+  await add('CLD', 'AWS Production Account', { provider: 'AWS', account_id: '4821-0093-1172', owner_email: 'cloud@cartrend.test', console_url: 'https://console.aws.amazon.com' }, { holder: { holderType: 'DEPARTMENT', holderId: depts.engineering }, serial: null, cost: 0, ownership: 'SUBSCRIPTION' });
   await add('SUB', 'Slack Business+', { plan: 'Business+', billing_cycle: 'Yearly', renewal_date: daysFromNow(180), seats: 60 }, { holder: { holderType: 'COMPANY', holderId: acme.id }, serial: null, cost: 540000, ownership: 'SUBSCRIPTION' });
-  await add('PRP', 'Pune Warehouse Building', { address: 'Plot 22, Chakan MIDC Phase II, Pune 410501', area_sq_ft: 42000 }, { holder: { holderType: 'COMPANY', holderId: logistics.id }, ownerCompanyId: logistics.id, cost: 145000000, serial: null, locationId: pune });
-  await add('LSE', 'Bengaluru Office Lease', { lease_start: daysFromNow(-500), lease_end: daysFromNow(595), monthly_rent: 850000 }, { holder: { holderType: 'COMPANY', holderId: acme.id }, serial: null, ownership: 'LEASED', locationId: blr });
+  await add('PRP', 'Bijwasan Warehouse Building', { address: 'Bijwasan, New Delhi 110061', area_sq_ft: 42000 }, { holder: { holderType: 'COMPANY', holderId: logistics.id }, ownerCompanyId: logistics.id, cost: 145000000, serial: null, locationId: pune });
+  await add('LSE', 'Karol Bagh Branch Lease', { lease_start: daysFromNow(-500), lease_end: daysFromNow(595), monthly_rent: 850000 }, { holder: { holderType: 'COMPANY', holderId: acme.id }, serial: null, ownership: 'LEASED', locationId: blr });
 
   // Pooled (quantity-tracked) assets.
   const m365 = await add('LIC', 'Microsoft 365 Business Premium', { product_version: '2025', license_expiry: daysFromNow(210) }, { quantity: 50, vendorId: vendors.microsoft, serial: null, cost: 1100000, ownership: 'LICENSED' });
@@ -409,7 +416,7 @@ async function main() {
 
   // A warehouse worker with no email: signs in with his employee ID and only sees his own kit.
   const anil = await emp('Anil', 'Yadav', depts.logistics, 'Picker and Packer', {
-    employeeCode: 'ACM1099',
+    employeeCode: 'CT000099',
     email: null,
     phone: null,
     personalEmail: null,
@@ -418,7 +425,7 @@ async function main() {
   });
   await add('HLM', 'Karam Safety Helmet', { size: 'L', isi_certified: true }, { holder: toEmp(anil), vendorId: vendors.karam, cost: 650, serial: null });
   await add('SHO', 'Karam FS 21 Safety Shoes', { size_uk: 8 }, { holder: toEmp(anil), cost: 1900, serial: null });
-  await add('ACC', 'Access Card — Pune Warehouse', { card_number: 'AC-PUN-20781', access_zones: ['Main Entrance', 'Warehouse'] }, { holder: toEmp(anil), serial: null, cost: 350 });
+  await add('ACC', 'Access Card — Bijwasan Warehouse', { card_number: 'AC-WH-20781', access_zones: ['Main Entrance', 'Warehouse'] }, { holder: toEmp(anil), serial: null, cost: 350 });
   await allocation.assign(admin, gloves, { holderType: 'EMPLOYEE', holderId: anil, quantity: 4 });
   await employeesSvc.grantAccess(admin, anil, { password: DEMO_PASSWORD });
 
@@ -466,7 +473,7 @@ async function main() {
 
   const [{ assetCount }] = await dbs.root.select({ assetCount: sql<number>`count(*)::int` }).from(sql`assets`);
   console.log(`✔ Seeded demo data: ${assetCount} assets, ${staff.length + 6} employees, ${Object.keys(types).length} asset types.`);
-  console.log(`  Sign in with admin@acme.test / ${DEMO_PASSWORD} (also it@, hr@, manager@, rahul@acme.test, or employee ID ACM1099)`);
+  console.log(`  Sign in with admin@cartrend.test / ${DEMO_PASSWORD} (also it@, hr@, manager@, rahul@cartrend.test, or employee ID CT000099)`);
   await app.close();
 }
 

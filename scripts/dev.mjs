@@ -30,7 +30,7 @@ children[0].stdout.on('data', (buf) => {
   if (/error TS/.test(text)) process.stdout.write(text);
 });
 
-console.log('\n  ➜ Open http://localhost:5173  (admin@acme.test / Demo@1234)');
+console.log('\n  ➜ Open http://localhost:5173  (admin@cartrend.test / Demo@1234)');
 console.log(PUBLIC_URL ? `  ➜ On a phone (same Wi-Fi): ${PUBLIC_URL} — QR codes use this address\n` : '  ! No network address found: QR codes will only open on this PC\n');
 
 let stopping = false;

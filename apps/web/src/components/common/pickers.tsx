@@ -1,11 +1,13 @@
 import { HOLDER_TYPE_LABELS, HOLDER_TYPES, type HolderType } from '@eam/shared';
 import { useQuery } from '@tanstack/react-query';
-import { Check, ChevronsUpDown, Loader2, X } from 'lucide-react';
+import { Check, ChevronsUpDown, Loader2, Plus, X } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, Popover, PopoverContent, PopoverTrigger } from '@/components/ui/overlays';
-import { api, type Page } from '@/lib/api';
+import { toast } from 'sonner';
+import { api, errorMessage, type Page } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { AssetIcon } from '@/lib/icons';
-import { useCompanies, useDepartments, useLocations, useVendors } from '@/lib/queries';
+import { queryClient, useCompanies, useDepartments, useLocations, useVendors } from '@/lib/queries';
 import type { AssetListItem, Employee } from '@/lib/types';
 import { useDebounced } from '@/lib/url-state';
 import { cn } from '@/lib/utils';
@@ -35,9 +37,18 @@ interface ComboboxProps {
   invalid?: boolean;
   className?: string;
   id?: string;
+  /**
+   * Adds an "Add …" item so people can enter something that isn't in the list yet.
+   * Receives the typed text; return an option to select it straight away.
+   */
+  onCreate?: (text: string) => Promise<Option | void> | Option | void;
+  /** Label for the add item, e.g. (t) => `Add company “${t}”`. */
+  createLabel?: (text: string) => string;
+  /** When false, the add item only appears once something is typed. */
+  createWithoutText?: boolean;
 }
 
-/** Searchable select built on cmdk: type to filter, arrows + Enter to pick. */
+/** Searchable select built on cmdk: type to filter, arrows + Enter to pick, optionally add new. */
 export function Combobox({
   value,
   onChange,
@@ -53,9 +64,29 @@ export function Combobox({
   invalid,
   className,
   id,
+  onCreate,
+  createLabel,
+  createWithoutText = true,
 }: ComboboxProps) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
+  const [creating, setCreating] = useState(false);
+  const typed = text.trim();
+  const exact = options.some((o) => o.label.toLowerCase() === typed.toLowerCase());
+  const showCreate = !!onCreate && (typed ? !exact : createWithoutText);
+  const create = async () => {
+    if (!onCreate || creating) return;
+    setCreating(true);
+    try {
+      const o = await onCreate(typed);
+      if (o) onChange(o.value, o);
+      setOpen(false);
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setCreating(false);
+    }
+  };
   const current = options.find((o) => o.value === value);
   const label = current?.label ?? (value ? selectedLabel : null);
 
@@ -133,6 +164,14 @@ export function Combobox({
                 </CommandItem>
               ))}
             </CommandGroup>
+            {showCreate && (
+              <CommandGroup className="border-t">
+                <CommandItem forceMount value={`__create__ ${typed}`} onSelect={() => void create()} disabled={creating} className="text-primary data-[selected=true]:text-primary">
+                  {creating ? <Loader2 className="animate-spin" /> : <Plus />}
+                  <span className="truncate font-medium">{createLabel ? createLabel(typed) : typed ? `Add “${typed}”` : 'Add new…'}</span>
+                </CommandItem>
+              </CommandGroup>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>
@@ -145,10 +184,22 @@ interface EntityPickerProps extends Omit<ComboboxProps, 'options' | 'onSearch' |
   /** Extra filters for asset search, e.g. { status: 'AVAILABLE', assetTypeId }. */
   assetFilter?: Record<string, string | undefined>;
   employeeFilter?: Record<string, string | undefined>;
+  /** For assets / employees: open a form to add a new one (receives the typed text). */
+  onAddNew?: (text: string) => void;
 }
 
+const QUICK_CREATE: Partial<Record<EntityPickerProps['kind'], { path: string; noun: string; body?: Record<string, unknown> }>> = {
+  COMPANY: { path: 'companies', noun: 'company' },
+  DEPARTMENT: { path: 'departments', noun: 'department' },
+  LOCATION: { path: 'locations', noun: 'location' },
+  INVENTORY: { path: 'locations', noun: 'store', body: { isStore: true, type: 'WAREHOUSE' } },
+  store: { path: 'locations', noun: 'store', body: { isStore: true, type: 'WAREHOUSE' } },
+  VENDOR: { path: 'vendors', noun: 'vendor' },
+};
+
 /** Picks an employee / department / location / company / vendor / store / asset by name. */
-export function EntityPicker({ kind, assetFilter, employeeFilter, placeholder, ...props }: EntityPickerProps) {
+export function EntityPicker({ kind, assetFilter, employeeFilter, placeholder, onAddNew, ...props }: EntityPickerProps) {
+  const { can } = useAuth();
   const [search, setSearch] = useState('');
   const q = useDebounced(search, 200);
   const [chosen, setChosen] = useState<string | null>(null);
@@ -205,9 +256,31 @@ export function EntityPicker({ kind, assetFilter, employeeFilter, placeholder, .
   }, [kind, employees.data, assets.data, departments.data, companies.data, vendors.data, locations.data]);
 
   const remote = kind === 'EMPLOYEE' || kind === 'asset';
+  const quick = QUICK_CREATE[kind];
+  // Type a name that isn't in the list and add it on the spot (company, department, location, vendor, store).
+  const quickCreate =
+    quick && can('org:manage')
+      ? async (name: string): Promise<Option | void> => {
+          if (!name) return void toast.info(`Type the new ${quick.noun}’s name first`);
+          const row = await api.post<{ id: string; name: string }>(`/${quick.path}`, { name, ...quick.body });
+          await queryClient.invalidateQueries({ queryKey: ['lookup'] });
+          toast.success(`Added ${quick.noun} “${row.name}”`);
+          return { value: row.id, label: row.name };
+        }
+      : undefined;
+  const addNew = onAddNew
+    ? (text: string) => {
+        onAddNew(text);
+      }
+    : undefined;
   return (
     <Combobox
       {...props}
+      onCreate={quickCreate ?? addNew}
+      createWithoutText={!quickCreate}
+      createLabel={(t) =>
+        quick ? `Add ${quick.noun} “${t}”` : kind === 'asset' ? (t ? `Add new asset “${t}”` : 'Add a new asset') : t ? `Add “${t}”` : 'Add new'
+      }
       options={options}
       loading={remote ? (kind === 'EMPLOYEE' ? employees.isFetching : assets.isFetching) && options.length === 0 : false}
       onSearch={remote ? setSearch : undefined}
@@ -229,12 +302,14 @@ export function HolderPicker({
   onChange,
   allowed = HOLDER_TYPES,
   invalid,
+  selectedLabel,
 }: {
   holderType: HolderType;
   holderId: string | null;
   onChange: (holderType: HolderType, holderId: string | null) => void;
   allowed?: readonly HolderType[];
   invalid?: boolean;
+  selectedLabel?: string | null;
 }) {
   return (
     <div className="space-y-2">
@@ -262,6 +337,7 @@ export function HolderPicker({
         kind={holderType}
         value={holderId}
         invalid={invalid}
+        selectedLabel={selectedLabel}
         onChange={(v) => onChange(holderType, v)}
         employeeFilter={{ status: 'ACTIVE,ON_LEAVE,NOTICE_PERIOD' }}
         placeholder={holderType === 'INVENTORY' ? 'Choose the store / warehouse…' : `Choose ${HOLDER_TYPE_LABELS[holderType].toLowerCase()}…`}

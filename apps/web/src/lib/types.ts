@@ -359,7 +359,9 @@ export interface AssetRequest {
   number: string;
   employeeId: string;
   requestedByName: string | null;
-  assetTypeId: string;
+  assetTypeId: string | null;
+  itemName: string | null;
+  custom: boolean;
   quantity: number;
   priority: Priority;
   neededBy: string | null;
