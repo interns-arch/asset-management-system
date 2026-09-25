@@ -108,8 +108,16 @@
     opacity: 0.6;
     cursor: pointer;
   }
-  .dark input[type='date']::-webkit-calendar-picker-indicator {
-    filter: invert(1);
+  /* Native controls (select lists, scrollbars, date pickers) follow the app theme. */
+  :root {
+    color-scheme: light;
+  }
+  .dark {
+    color-scheme: dark;
+  }
+  select option {
+    background-color: var(--popover);
+    color: var(--popover-foreground);
   }
 }
 
