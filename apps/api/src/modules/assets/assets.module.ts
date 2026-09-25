@@ -1,4 +1,6 @@
-import { Body, Controller, Get, HttpCode, Module, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Module, Param, ParseUUIDPipe, Patch, Post, Query, Res, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
 import {
   assetCreateSchema,
   type AssetCreateInput,
@@ -22,6 +24,7 @@ import { AllocationService } from './allocation.service';
 import { AssetsService } from './assets.service';
 import { HoldersService } from './holders.service';
 import { LifecycleService } from './lifecycle.service';
+import { MAX_PHOTO_BYTES, MAX_PHOTOS_PER_UPLOAD, PhotosService, type UploadedPhoto } from './photos.service';
 
 @Controller('assets')
 export class AssetsController {
@@ -29,6 +32,7 @@ export class AssetsController {
     private readonly assets: AssetsService,
     private readonly allocation: AllocationService,
     private readonly lifecycle: LifecycleService,
+    private readonly photos: PhotosService,
   ) {}
 
   @Get()
@@ -101,6 +105,26 @@ export class AssetsController {
     return this.allocation.returnAsset(actor, id, body);
   }
 
+  @Post(':id/photos')
+  @RequirePermissions('asset:assign')
+  @UseInterceptors(FilesInterceptor('photos', MAX_PHOTOS_PER_UPLOAD, { limits: { fileSize: MAX_PHOTO_BYTES, files: MAX_PHOTOS_PER_UPLOAD } }))
+  uploadPhotos(
+    @CurrentActor() actor: Actor,
+    @Param('id', ParseUUIDPipe) id: string,
+    @UploadedFiles() files: UploadedPhoto[] | undefined,
+    @Body() body: { allocationId?: string; kind?: string },
+  ) {
+    return this.photos.upload(actor, id, body?.allocationId, body?.kind, files);
+  }
+
+  @Get(':id/photos/:photoId')
+  async photo(@CurrentActor() actor: Actor, @Param('id', ParseUUIDPipe) id: string, @Param('photoId', ParseUUIDPipe) photoId: string, @Res() res: Response) {
+    await this.assets.assertCanView(actor, id);
+    const file = await this.photos.file(id, photoId);
+    res.setHeader('Cache-Control', 'private, max-age=86400, immutable');
+    res.type(file.mimeType).sendFile(file.path, { dotfiles: 'allow' });
+  }
+
   @Post(':id/lifecycle')
   @HttpCode(200)
   perform(@CurrentActor() actor: Actor, @Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(lifecycleSchema)) body: LifecycleInput) {
@@ -110,8 +134,8 @@ export class AssetsController {
 
 @Module({
   imports: [CatalogModule],
-  providers: [AssetsService, AllocationService, LifecycleService, HoldersService],
+  providers: [AssetsService, AllocationService, LifecycleService, HoldersService, PhotosService],
   controllers: [AssetsController],
-  exports: [AssetsService, AllocationService, LifecycleService, HoldersService],
+  exports: [AssetsService, AllocationService, LifecycleService, HoldersService, PhotosService],
 })
 export class AssetsModule {}

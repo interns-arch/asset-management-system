@@ -9,7 +9,7 @@ Tracks the build milestones so work can resume after any interruption.
 - [x] 5. Exit workflow: checklist, notifications, scan-to-return, blocking, override
 - [x] 6. Requests, tickets, maintenance, dashboard, global search
 - [x] 7. Web app (React): shell, pages, forms, keyboard shortcuts, responsive + dark mode
-- [x] 8. Automated tests (22 passing), end-to-end browser check of the exit flow, production build, README
+- [x] 8. Automated tests (22 passing at the time; 28 now), end-to-end browser check of the exit flow, production build, README
 
 - [x] 9. One QR per person (QR = employee ID), unified Scan, phone-first person page, ID cards,
        view-only employee logins by employee ID, IT full access, "Mark checked" (2026-09-24)
@@ -17,6 +17,9 @@ Tracks the build milestones so work can resume after any interruption.
 - [x] 10. Person QR = link with the employee ID (opens from any phone camera); "Add new" in
        dropdowns (assets, companies, departments, locations, vendors); requests for anything
        not in the catalog; Cartrend Autoparts branding and demo data; friendlier employee home (2026-09-24)
+
+- [x] 11. Priority queue (tickets + requests, Urgent first, overdue flagged); handover / return
+       photos saved with each assignment, including request fulfilment (2026-09-25)
 
 ## Possible next steps
 - AI assistant on top of the permission-checked API (the design already allows it)

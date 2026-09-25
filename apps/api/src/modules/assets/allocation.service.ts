@@ -289,7 +289,7 @@ export class AllocationService {
         ],
         metadata: { allocationId: alloc.id, notes: input.notes ?? null },
       });
-      return { ok: true, status: newStatus };
+      return { ok: true, status: newStatus, allocationId: alloc.id };
     });
   }
 

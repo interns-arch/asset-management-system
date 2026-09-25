@@ -70,7 +70,8 @@ only sees their own assets and QR. The IT role has full access.
   and filterable.
 - **Custody** — assign to an employee, department, location, company, vendor or inventory;
   transfer and return with condition. Full assignment and ownership history. The database
-  itself prevents double assignment.
+  itself prevents double assignment. Handover and return photos (camera or gallery, shrunk to
+  ~1600px in the browser) are saved with each assignment as proof of condition.
 - **Exit / notice period** — automatic recovery checklist of every held asset, IT/Admin
   notification, last working day countdown, returned / pending / damaged / missing tracking,
   scan-to-return, and completion blocked until cleared or an authorised override (with reason)
@@ -89,6 +90,8 @@ only sees their own assets and QR. The IT role has full access.
   Department, Location, Vendor, Request, Ticket, Maintenance.
 - **Requests, tickets, maintenance** — request → approve → fulfil (assigns the asset);
   tickets against assets; maintenance moves an asset into and back out of service.
+- **Priority queue** — one worklist (`G Q`) of open tickets and requests to approve or fulfil,
+  ordered Urgent → High → Medium → Low, then overdue, then oldest; also on the dashboard.
 - **Roles & permissions** — Admin and IT / Asset Manager (full access), HR, Manager, and
   Employee (view only: their own assets and QR, plus requests and tickets). All editable.
 
@@ -135,5 +138,6 @@ DATABASE_URL=postgres://user:pass@host:5432/eam SEED_DEMO=false \
 | `SEED_DEMO`     | `true`                                    | `false`: no demo data; creates roles + the first admin from `ADMIN_EMAIL` / `ADMIN_PASSWORD` |
 | `COOKIE_SECURE` | `true` in production                      | Set `false` only when not behind HTTPS  |
 | `DB_POOL_SIZE`  | `20`                                      | Connections per API instance            |
+| `UPLOAD_DIR`    | `./.data/uploads`                         | Where handover / return photos are stored — include it in backups |
 
 Seeding only runs on an empty database, so restarts never touch existing data.

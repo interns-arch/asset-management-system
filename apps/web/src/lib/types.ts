@@ -147,6 +147,38 @@ export interface Allocation {
   endedByName: string | null;
   returnCondition: Condition | null;
   endNotes: string | null;
+  photos?: AllocationPhoto[];
+}
+
+export interface AllocationPhoto {
+  id: string;
+  assetId: string;
+  allocationId: string;
+  kind: 'HANDOVER' | 'RETURN';
+  uploadedByName: string | null;
+  createdAt: string;
+}
+
+export interface QueueItem {
+  kind: 'TICKET' | 'REQUEST';
+  id: string;
+  number: string;
+  title: string;
+  detail: string;
+  priority: Priority;
+  status: string;
+  createdAt: string;
+  dueDate: string | null;
+  overdue: boolean;
+  assigneeName: string | null;
+  link: string;
+}
+
+export interface Queue {
+  items: QueueItem[];
+  counts: Record<Priority, number>;
+  total: number;
+  overdue: number;
 }
 
 export interface MaintenanceRecord {

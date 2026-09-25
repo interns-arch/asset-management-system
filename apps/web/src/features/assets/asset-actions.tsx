@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { HolderLabel } from '@/components/common/badges';
 import { Field } from '@/components/common/form';
+import { PhotoPicker, uploadPhotos } from '@/components/common/photos';
 import { EntityPicker, HolderPicker } from '@/components/common/pickers';
 import { Button } from '@/components/ui/button';
 import { Input, Textarea } from '@/components/ui/input';
@@ -34,7 +35,7 @@ export type AssetDialog =
 export function AssetActionDialog({ dialog, onClose, onDone }: { dialog: AssetDialog | null; onClose: () => void; onDone?: () => void }) {
   return (
     <Dialog open={!!dialog} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-h-[92dvh] max-w-md overflow-y-auto">
         {dialog?.kind === 'assign' && <AssignBody key={dialog.asset.id} dialog={dialog} onClose={onClose} onDone={onDone} />}
         {dialog?.kind === 'transfer' && <AssignBody key={dialog.asset.id} dialog={dialog} onClose={onClose} onDone={onDone} />}
         {dialog?.kind === 'return' && <ReturnBody key={dialog.asset.id} dialog={dialog} onClose={onClose} onDone={onDone} />}
@@ -44,9 +45,27 @@ export function AssetActionDialog({ dialog, onClose, onDone }: { dialog: AssetDi
   );
 }
 
+interface ActionInput {
+  path: string;
+  body: unknown;
+  photos?: { assetId: string; kind: 'HANDOVER' | 'RETURN'; files: File[] };
+}
+
 function useAction(onClose: () => void, onDone?: () => void) {
   return useMutation({
-    mutationFn: ({ path, body }: { path: string; body: unknown }) => api.post(path, body),
+    mutationFn: async ({ path, body, photos }: ActionInput) => {
+      const res = await api.post<{ id?: string; allocationId?: string }>(path, body);
+      const allocationId = res?.allocationId ?? res?.id;
+      if (photos?.files.length && allocationId) {
+        // The assignment is already saved; a failed upload must not look like a failed handover.
+        try {
+          await uploadPhotos(photos.assetId, allocationId, photos.kind, photos.files);
+        } catch (err) {
+          toast.error(`Saved, but the photos did not upload: ${errorMessage(err)}`);
+        }
+      }
+      return res;
+    },
     onSuccess: async () => {
       await invalidateAssetData();
       onDone?.();
@@ -65,6 +84,7 @@ function AssignBody({ dialog, onClose, onDone }: { dialog: Extract<AssetDialog, 
   const [quantity, setQuantity] = useState(1);
   const [expected, setExpected] = useState('');
   const [notes, setNotes] = useState('');
+  const [photos, setPhotos] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const action = useAction(onClose, onDone);
   const allowed = pooled ? HOLDER_TYPES.filter((t) => t !== 'INVENTORY') : HOLDER_TYPES;
@@ -76,6 +96,7 @@ function AssignBody({ dialog, onClose, onDone }: { dialog: Extract<AssetDialog, 
       {
         path: `/assets/${dialog.asset.id}/${transfer ? 'transfer' : 'assign'}`,
         body: { holderType, holderId, quantity, expectedReturnDate: expected || null, notes, allocationId: transfer ? dialog.allocation?.id : undefined },
+        photos: { assetId: dialog.asset.id, kind: 'HANDOVER', files: photos },
       },
       { onSuccess: () => toast.success(transfer ? `${dialog.asset.assetTag} transferred` : `${dialog.asset.assetTag} assigned`) },
     );
@@ -117,6 +138,9 @@ function AssignBody({ dialog, onClose, onDone }: { dialog: Extract<AssetDialog, 
         <Field label="Notes">
           <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Handover notes, accessories included…" />
         </Field>
+        <Field label="Handover photos">
+          <PhotoPicker files={photos} onChange={setPhotos} />
+        </Field>
       </div>
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>
@@ -134,6 +158,7 @@ function ReturnBody({ dialog, onClose, onDone }: { dialog: Extract<AssetDialog, 
   const [condition, setCondition] = useState<Condition>('GOOD');
   const [makeAvailable, setMakeAvailable] = useState(true);
   const [notes, setNotes] = useState('');
+  const [photos, setPhotos] = useState<File[]>([]);
   const action = useAction(onClose, onDone);
   const holder = dialog.allocation?.holderName ?? dialog.asset.holderName;
   useEffect(() => {
@@ -182,6 +207,9 @@ function ReturnBody({ dialog, onClose, onDone }: { dialog: Extract<AssetDialog, 
         <Field label="Notes">
           <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Missing accessories, scratches…" />
         </Field>
+        <Field label="Return photos">
+          <PhotoPicker files={photos} onChange={setPhotos} hint="Optional · capture scratches or damage as proof" />
+        </Field>
       </div>
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>
@@ -191,7 +219,7 @@ function ReturnBody({ dialog, onClose, onDone }: { dialog: Extract<AssetDialog, 
           loading={action.isPending}
           onClick={() =>
             action.mutate(
-              { path: `/assets/${dialog.asset.id}/return`, body: { allocationId: dialog.allocation?.id, condition, makeAvailable, notes } },
+              { path: `/assets/${dialog.asset.id}/return`, body: { allocationId: dialog.allocation?.id, condition, makeAvailable, notes }, photos: { assetId: dialog.asset.id, kind: 'RETURN', files: photos } },
               { onSuccess: () => toast.success(`${dialog.asset.assetTag} returned`) },
             )
           }

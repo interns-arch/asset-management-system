@@ -7,6 +7,7 @@ import {
   ClipboardList,
   LayoutDashboard,
   LifeBuoy,
+  ListOrdered,
   LogOut,
   MapPin,
   ScanLine,
@@ -29,6 +30,7 @@ export interface NavItem {
 
 export const MAIN_NAV: NavItem[] = [
   { label: 'Dashboard', to: '/', icon: LayoutDashboard, shortcut: 'G D' },
+  { label: 'Priority queue', to: '/queue', icon: ListOrdered, perms: ['ticket:manage', 'request:approve', 'request:fulfil'], shortcut: 'G Q' },
   { label: 'Assets', to: '/assets', icon: Boxes, shortcut: 'G A' },
   { label: 'Employees', to: '/employees', icon: Users, perms: ['employee:view'], shortcut: 'G E' },
   { label: 'Exits', to: '/exits', icon: LogOut, perms: ['exit:view'], shortcut: 'G X' },

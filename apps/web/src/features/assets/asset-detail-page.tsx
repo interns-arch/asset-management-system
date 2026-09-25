@@ -22,6 +22,7 @@ import { Barcode, QRCode, useQrLinks } from '@/components/common/codes';
 import { AttributeList } from '@/components/common/dynamic-fields';
 import { DetailList, EmptyState, ErrorState, PageLoader } from '@/components/common/page';
 import { Timeline } from '@/components/common/timeline';
+import { PhotoStrip } from '@/components/common/photos';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -311,6 +312,7 @@ export default function AssetDetailPage() {
                             <p className="text-xs text-muted-foreground">
                               ×{al.quantity} · since {formatDate(al.assignedAt)}
                             </p>
+                            <PhotoStrip photos={al.photos} size="sm" className="mt-1" />
                           </div>
                           {can('asset:assign') && (
                             <>
@@ -352,6 +354,12 @@ export default function AssetDetailPage() {
                           ...(al.notes ? [{ label: 'Notes', value: al.notes }] : []),
                         ]}
                       />
+                      {!!al.photos?.length && (
+                        <div>
+                          <p className="mb-1.5 text-xs text-muted-foreground">Handover photos</p>
+                          <PhotoStrip photos={al.photos} />
+                        </div>
+                      )}
                     </div>
                   );
                 })()
@@ -406,6 +414,7 @@ function AllocationHistory({ assetId }: { assetId: string }) {
           <TH>From</TH>
           <TH>To</TH>
           <TH>Outcome</TH>
+          <TH>Photos</TH>
         </TR>
       </THead>
       <TBody>
@@ -430,6 +439,7 @@ function AllocationHistory({ assetId }: { assetId: string }) {
                 </span>
               )}
             </TD>
+            <TD>{al.photos?.length ? <PhotoStrip photos={al.photos} size="sm" className="min-w-24" /> : <span className="text-muted-foreground">—</span>}</TD>
           </TR>
         ))}
       </TBody>

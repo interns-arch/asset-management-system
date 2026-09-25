@@ -14,9 +14,10 @@ import {
   type TicketUpdateInput,
 } from '@eam/shared';
 import type { Actor } from '../../common/actor';
-import { CurrentActor, ZodPipe } from '../../common/http';
+import { CurrentActor, RequirePermissions, ZodPipe } from '../../common/http';
 import { AssetsModule } from '../assets/assets.module';
 import { MaintenanceService } from './maintenance.service';
+import { QueueService } from './queue.service';
 import { RequestsService } from './requests.service';
 import { TicketsService } from './tickets.service';
 
@@ -98,9 +99,20 @@ export class MaintenanceController {
   }
 }
 
+@Controller('queue')
+export class QueueController {
+  constructor(private readonly queue: QueueService) {}
+
+  @Get()
+  @RequirePermissions('ticket:manage', 'request:approve', 'request:fulfil')
+  list(@CurrentActor() actor: Actor, @Query() q: Record<string, string>) {
+    return this.queue.list(actor, q);
+  }
+}
+
 @Module({
   imports: [AssetsModule],
-  providers: [RequestsService, TicketsService, MaintenanceService],
-  controllers: [RequestsController, TicketsController, MaintenanceController],
+  providers: [RequestsService, TicketsService, MaintenanceService, QueueService],
+  controllers: [RequestsController, TicketsController, MaintenanceController, QueueController],
 })
 export class ServiceModule {}

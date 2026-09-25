@@ -35,9 +35,9 @@ async function request<T>(method: string, path: string, body?: unknown, query?: 
       headers: {
         Accept: 'application/json',
         'X-Requested-With': 'XMLHttpRequest',
-        ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(body !== undefined && !(body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
       },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: body instanceof FormData ? body : body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
     throw new ApiError(0, 'Cannot reach the server. Check your connection.');
@@ -67,6 +67,7 @@ export const api = {
   post: <T>(path: string, body: unknown = {}) => request<T>('POST', path, body),
   patch: <T>(path: string, body: unknown) => request<T>('PATCH', path, body),
   del: <T>(path: string) => request<T>('DELETE', path),
+  upload: <T>(path: string, form: FormData) => request<T>('POST', path, form),
 };
 
 export function errorMessage(err: unknown): string {

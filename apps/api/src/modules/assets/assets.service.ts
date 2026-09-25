@@ -35,6 +35,7 @@ import { SequenceService } from '../../core/sequence.service';
 import { CatalogService, type EffectiveField, toFieldDef } from '../catalog/catalog.service';
 import { AllocationService, type AssetRow } from './allocation.service';
 import { LifecycleService } from './lifecycle.service';
+import { PhotosService } from './photos.service';
 
 const CORE_LABELS: Record<string, string> = {
   name: 'Name',
@@ -79,6 +80,7 @@ export class AssetsService {
     private readonly catalog: CatalogService,
     private readonly allocation: AllocationService,
     private readonly lifecycle: LifecycleService,
+    private readonly photos: PhotosService,
   ) {}
 
   // ─── Access ───────────────────────────────────────────────────────────────
@@ -364,7 +366,7 @@ export class AssetsService {
       vendorName: row.vendorName,
       fields,
       archivedFields: archived.filter((f) => row.asset.attributes[f.key] !== undefined),
-      activeAllocations: active,
+      activeAllocations: await this.photos.withPhotos(active),
       openMaintenance: maintenance,
       openExits,
     };
@@ -625,7 +627,7 @@ export class AssetsService {
 
   async allocationHistory(actor: Actor, id: string) {
     await this.assertCanView(actor, id);
-    return this.allocation.listForAsset(id);
+    return this.photos.withPhotos(await this.allocation.listForAsset(id));
   }
 
   async timeline(actor: Actor, id: string, q: Record<string, string>) {

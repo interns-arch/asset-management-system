@@ -1,3 +1,4 @@
+import { humanize, PRIORITIES } from '@eam/shared';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Check, ClipboardList, PackageCheck, Plus, Search, X } from 'lucide-react';
 import { useState } from 'react';
@@ -6,10 +7,11 @@ import { EnumBadge } from '@/components/common/badges';
 import { useConfirm } from '@/components/common/confirm';
 import { type Column, DataTable, Pagination } from '@/components/common/data-table';
 import { Field } from '@/components/common/form';
+import { PhotoPicker, uploadPhotos } from '@/components/common/photos';
 import { EmptyState, PageHeader } from '@/components/common/page';
 import { EntityPicker } from '@/components/common/pickers';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Input, NativeSelect } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/overlays';
 import { Card } from '@/components/ui/primitives';
 import { useQuickAdd } from '@/features/quick-add/quick-add';
@@ -158,6 +160,14 @@ export default function RequestsPage() {
             {t.label}
           </button>
         ))}
+        <NativeSelect className="ml-auto h-8 w-auto shrink-0 text-[13px]" value={f.priority ?? ''} onChange={(e) => set({ priority: e.target.value })}>
+          <option value="">Any priority</option>
+          {PRIORITIES.map((p) => (
+            <option key={p} value={p}>
+              {humanize(p)}
+            </option>
+          ))}
+        </NativeSelect>
       </div>
       <Card className="overflow-hidden">
         <div className="border-b p-3">
@@ -197,12 +207,23 @@ export default function RequestsPage() {
 
 function FulfilDialog({ request, onClose }: { request: AssetRequest | null; onClose: () => void }) {
   const [assetId, setAssetId] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<File[]>([]);
   const save = useMutation({
-    mutationFn: () => api.post(`/requests/${request!.id}/fulfil`, { assetId }),
+    mutationFn: async () => {
+      const res = await api.post<{ allocationId: string }>(`/requests/${request!.id}/fulfil`, { assetId });
+      if (photos.length) {
+        try {
+          await uploadPhotos(assetId!, res.allocationId, 'HANDOVER', photos);
+        } catch (err) {
+          toast.error(`Fulfilled, but the photos did not upload: ${errorMessage(err)}`);
+        }
+      }
+    },
     onSuccess: async () => {
       await invalidateAssetData();
       toast.success(`${request!.number} fulfilled — asset assigned to ${request!.employeeName}`);
       setAssetId(null);
+      setPhotos([]);
       onClose();
     },
     onError: (err) => toast.error(errorMessage(err)),
@@ -217,9 +238,14 @@ function FulfilDialog({ request, onClose }: { request: AssetRequest | null; onCl
           </DialogDescription>
         </DialogHeader>
         {request && (
-          <Field label="Asset">
-            <EntityPicker kind="asset" value={assetId} onChange={setAssetId} assetFilter={{ assetTypeId: request.assetTypeId ?? undefined, status: 'AVAILABLE,IN_INVENTORY' }} />
-          </Field>
+          <div className="grid gap-4">
+            <Field label="Asset">
+              <EntityPicker kind="asset" value={assetId} onChange={setAssetId} assetFilter={{ assetTypeId: request.assetTypeId ?? undefined, status: 'AVAILABLE,IN_INVENTORY' }} />
+            </Field>
+            <Field label="Handover photos">
+              <PhotoPicker files={photos} onChange={setPhotos} />
+            </Field>
+          </div>
         )}
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>

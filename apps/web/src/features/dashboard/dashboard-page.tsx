@@ -7,6 +7,7 @@ import { EmptyState, ErrorState, PageHeader, PageLoader, StatCard } from '@/comp
 import { Timeline } from '@/components/common/timeline';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, Progress } from '@/components/ui/primitives';
+import { QueueCard } from '@/features/queue/queue-page';
 import { useQuickAdd } from '@/features/quick-add/quick-add';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -101,6 +102,7 @@ function OrgView({ data, name }: { data: OrgDashboard; name?: string }) {
   const statusTotal = ASSET_STATUSES.reduce((n, s) => n + (s === 'DISPOSED' ? 0 : data.byStatus[s] ?? 0), 0) || 1;
   const maxLoc = Math.max(1, ...data.byLocation.map((l) => l.count));
   const utilisation = t.assets ? Math.round((t.assigned / t.assets) * 100) : 0;
+  const { can } = useAuth();
 
   return (
     <div className="space-y-5">
@@ -126,6 +128,8 @@ function OrgView({ data, name }: { data: OrgDashboard; name?: string }) {
         <StatCard label="Requests to action" value={t.pendingRequests + t.approvedRequests} hint={`${t.pendingRequests} pending · ${t.approvedRequests} to fulfil`} icon={ClipboardList} to="/requests" />
         <StatCard label="Warranties expiring (30d)" value={t.warrantyExpiring} hint={t.lost ? `${t.lost} lost asset(s)` : undefined} icon={ShieldAlert} tone={t.warrantyExpiring ? 'amber' : 'default'} to="/assets?warranty=expiring" />
       </div>
+
+      {can('ticket:manage', 'request:approve', 'request:fulfil') && <QueueCard />}
 
       <div className="grid gap-5 xl:grid-cols-3">
         <Card className="xl:col-span-2">

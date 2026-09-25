@@ -40,6 +40,15 @@ async function login(who: string, email: string) {
   cookies[who] = res.headers.get('set-cookie')!.split(';')[0];
 }
 
+async function upload(path: string, fields: Record<string, string>, files: Buffer[], who = 'admin') {
+  const form = new FormData();
+  for (const [k, v] of Object.entries(fields)) form.append(k, v);
+  for (const f of files) form.append('photos', new Blob([new Uint8Array(f)], { type: 'image/jpeg' }), 'photo.jpg');
+  const res = await fetch(base + path, { method: 'POST', headers: { 'x-requested-with': 'XMLHttpRequest', cookie: cookies[who] }, body: form });
+  const text = await res.text();
+  return { status: res.status, body: text ? JSON.parse(text) : null };
+}
+
 let ids: Record<string, string> = {};
 
 before(async () => {
@@ -272,6 +281,39 @@ describe('custody and lifecycle', () => {
     for (const a of ['CREATED', 'ASSIGNED', 'TRANSFERRED', 'RETURNED']) assert.ok(actions.includes(a), `history has ${a}`);
   });
 
+  test('handover and return photos are kept with the assignment and shown only to those who can see the asset', async () => {
+    const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(64, 7)]);
+    const drone = await newDrone();
+    const id = drone.body.id;
+    const assigned = await call('POST', `/assets/${id}/assign`, { holderType: 'EMPLOYEE', holderId: ids.bob });
+
+    assert.equal((await upload(`/assets/${id}/photos`, { allocationId: assigned.body.id, kind: 'HANDOVER' }, [Buffer.from('not an image')])).status, 400);
+    assert.equal((await upload(`/assets/${id}/photos`, { allocationId: assigned.body.id, kind: 'HANDOVER' }, [jpeg], 'bob')).status, 403);
+    const saved = await upload(`/assets/${id}/photos`, { allocationId: assigned.body.id, kind: 'HANDOVER' }, [jpeg, jpeg]);
+    assert.equal(saved.status, 201);
+    assert.equal(saved.body.length, 2);
+
+    // The holder can see the handover photos of their own asset.
+    const res = await fetch(`${base}/assets/${id}/photos/${saved.body[0].id}`, { headers: { cookie: cookies.bob } });
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('content-type'), 'image/jpeg');
+    assert.ok(Buffer.from(await res.arrayBuffer()).equals(jpeg));
+
+    const returned = await call('POST', `/assets/${id}/return`, { condition: 'GOOD', makeAvailable: true });
+    assert.equal(returned.body.allocationId, assigned.body.id);
+    assert.equal((await upload(`/assets/${id}/photos`, { allocationId: assigned.body.id, kind: 'RETURN' }, [jpeg])).status, 201);
+    const allocations = await call('GET', `/assets/${id}/allocations`);
+    assert.deepEqual(
+      allocations.body[0].photos.map((p: { kind: string }) => p.kind),
+      ['HANDOVER', 'HANDOVER', 'RETURN'],
+    );
+
+    // Once the asset belongs to someone else, Bob can no longer open its photos.
+    await call('POST', `/assets/${id}/assign`, { holderType: 'EMPLOYEE', holderId: ids.alice });
+    const denied = await fetch(`${base}/assets/${id}/photos/${saved.body[0].id}`, { headers: { cookie: cookies.bob } });
+    assert.ok(denied.status === 403 || denied.status === 404);
+  });
+
   test('invalid lifecycle transitions are refused', async () => {
     const drone = await newDrone();
     const dispose = await call('POST', `/assets/${drone.body.id}/lifecycle`, { action: 'dispose' });
@@ -337,6 +379,31 @@ describe('employee exit', () => {
     const exit = await call('GET', `/exit-cases/${caseId}`);
     assert.equal(exit.body.overridden, true);
     assert.equal(exit.body.items[0].status, 'MISSING');
+  });
+});
+
+describe('priority queue', () => {
+  test('open tickets and requests are listed most urgent first, and only for the support team', async () => {
+    await call('POST', '/tickets', { title: 'Low one', type: 'ISSUE', priority: 'LOW' });
+    await call('POST', '/tickets', { title: 'Server room AC down', type: 'ISSUE', priority: 'URGENT' });
+    await call('POST', '/requests', { employeeId: ids.alice, assetTypeId: ids.type, quantity: 1, priority: 'HIGH', reason: 'Site survey next week' });
+    await call('POST', '/requests', { employeeId: ids.alice, itemName: 'Ring light', quantity: 1, priority: 'HIGH', reason: 'Product shoots', neededBy: '2020-01-01' });
+
+    const q = await call('GET', '/queue', undefined, 'it');
+    assert.equal(q.status, 200);
+    const ranks = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 } as Record<string, number>;
+    const order = q.body.items.map((i: { priority: string }) => ranks[i.priority]);
+    assert.deepEqual(order, [...order].sort((a: number, b: number) => a - b));
+    assert.equal(q.body.items[0].title, 'Server room AC down');
+    // Within the same priority, an overdue request comes first.
+    const high = q.body.items.filter((i: { priority: string }) => i.priority === 'HIGH');
+    assert.equal(high[0].title, 'Ring light');
+    assert.equal(high[0].overdue, true);
+    assert.ok(q.body.counts.URGENT >= 1 && q.body.counts.LOW >= 1);
+
+    const urgentOnly = await call('GET', '/queue?priority=URGENT', undefined, 'it');
+    assert.ok(urgentOnly.body.items.every((i: { priority: string }) => i.priority === 'URGENT'));
+    assert.equal((await call('GET', '/queue', undefined, 'bob')).status, 403);
   });
 });
 

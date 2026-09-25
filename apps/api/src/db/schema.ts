@@ -370,6 +370,30 @@ export const allocations = pgTable(
   ],
 );
 
+export const PHOTO_KINDS = ['HANDOVER', 'RETURN'] as const;
+
+/** Condition photos taken when an asset is handed over or returned. Files live in UPLOAD_DIR. */
+export const allocationPhotos = pgTable(
+  'allocation_photos',
+  {
+    id: pk(),
+    assetId: uuid('asset_id')
+      .notNull()
+      .references(() => assets.id, { onDelete: 'cascade' }),
+    allocationId: uuid('allocation_id')
+      .notNull()
+      .references(() => allocations.id, { onDelete: 'cascade' }),
+    kind: text('kind', { enum: PHOTO_KINDS }).notNull(),
+    fileName: text('file_name').notNull(),
+    mimeType: text('mime_type').notNull(),
+    sizeBytes: integer('size_bytes').notNull(),
+    uploadedBy: uuid('uploaded_by'),
+    uploadedByName: text('uploaded_by_name'),
+    createdAt: createdAt(),
+  },
+  (t) => [index('allocation_photos_alloc_idx').on(t.allocationId), index('allocation_photos_asset_idx').on(t.assetId)],
+);
+
 export const ownershipRecords = pgTable(
   'ownership_records',
   {

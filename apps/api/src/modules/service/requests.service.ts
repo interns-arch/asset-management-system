@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, ilike, inArray, or, sql, type SQL } from 'drizzle-orm';
-import { REQUEST_STATUSES, type RequestInput } from '@eam/shared';
+import { PRIORITIES, REQUEST_STATUSES, type RequestInput } from '@eam/shared';
 import { type Actor, assertCan, canAny } from '../../common/actor';
 import { badRequest, conflict, likePattern, listFilter, listParams, notFound } from '../../common/http';
 import { DbService } from '../../db/db.service';
@@ -9,6 +9,7 @@ import { HistoryService } from '../../core/history.service';
 import { NotificationsService } from '../../core/notifications.service';
 import { SequenceService } from '../../core/sequence.service';
 import { AllocationService } from '../assets/allocation.service';
+import { PRIORITY_RANK } from './queue.service';
 
 /** Asset requests: employee asks → manager approves → IT fulfils by assigning an asset. */
 @Injectable()
@@ -34,6 +35,8 @@ export class RequestsService {
     }
     const statuses = listFilter(q.status, REQUEST_STATUSES);
     if (statuses.length) conds.push(inArray(assetRequests.status, statuses));
+    const priorities = listFilter(q.priority, PRIORITIES);
+    if (priorities.length) conds.push(inArray(assetRequests.priority, priorities));
     if (p.search) {
       const like = likePattern(p.search);
       conds.push(or(ilike(assetRequests.number, like), ilike(employees.fullName, like), ilike(assetTypes.name, like), ilike(assetRequests.itemName, like), ilike(assetRequests.reason, like))!);
@@ -65,6 +68,7 @@ export class RequestsService {
         .where(where)
         .orderBy(
           sql`case ${assetRequests.status} when 'PENDING' then 0 when 'APPROVED' then 1 else 2 end`,
+          sql`case when ${assetRequests.status} in ('PENDING', 'APPROVED') then ${PRIORITY_RANK(assetRequests.priority)} else 0 end`,
           p.dir === 'asc' ? asc(assetRequests.createdAt) : desc(assetRequests.createdAt),
         )
         .limit(p.pageSize)
@@ -169,7 +173,7 @@ export class RequestsService {
         const [type] = await db.select({ name: assetTypes.name }).from(assetTypes).where(eq(assetTypes.id, r.assetTypeId));
         throw badRequest(`Pick a ${type?.name ?? 'matching'} asset`, { assetId: 'Wrong asset type' });
       }
-      await this.allocation.assign(actor, assetId, {
+      const alloc = await this.allocation.assign(actor, assetId, {
         holderType: 'EMPLOYEE',
         holderId: r.employeeId,
         quantity: asset.trackingMode === 'QUANTITY' ? r.quantity : 1,
@@ -189,7 +193,7 @@ export class RequestsService {
         employeeId: r.employeeId,
         assetId,
       });
-      return row;
+      return { ...row, allocationId: alloc.id };
     });
   }
 

@@ -8,6 +8,7 @@ import { assets, tickets, users } from '../../db/schema';
 import { diffChanges, HistoryService } from '../../core/history.service';
 import { NotificationsService } from '../../core/notifications.service';
 import { SequenceService } from '../../core/sequence.service';
+import { PRIORITY_RANK } from './queue.service';
 
 /** Tickets: issues, damage, loss or repair requests raised against an asset. */
 @Injectable()
@@ -47,7 +48,7 @@ export class TicketsService {
         .where(where)
         .orderBy(
           sql`case ${tickets.status} when 'OPEN' then 0 when 'IN_PROGRESS' then 1 else 2 end`,
-          sql`case ${tickets.priority} when 'URGENT' then 0 when 'HIGH' then 1 when 'MEDIUM' then 2 else 3 end`,
+          PRIORITY_RANK(tickets.priority),
           desc(tickets.createdAt),
         )
         .limit(p.pageSize)

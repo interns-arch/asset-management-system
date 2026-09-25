@@ -29,6 +29,13 @@
       "when": 1790244700950,
       "tag": "0003_request_any_item",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790311694133,
+      "tag": "0004_allocation_photos",
+      "breakpoints": true
     }
   ]
 }

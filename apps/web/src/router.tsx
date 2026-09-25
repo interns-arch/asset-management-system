@@ -20,6 +20,7 @@ const ExitsPage = lazy(() => import('@/features/exits/exits-page'));
 const ExitDetailPage = lazy(() => import('@/features/exits/exit-detail-page'));
 const RequestsPage = lazy(() => import('@/features/service/requests-page'));
 const TicketsPage = lazy(() => import('@/features/service/tickets-page'));
+const QueuePage = lazy(() => import('@/features/queue/queue-page'));
 const MaintenancePage = lazy(() => import('@/features/service/maintenance-page'));
 const ActivityPage = lazy(() => import('@/features/activity/activity-page'));
 const CatalogPage = lazy(() => import('@/features/catalog/catalog-page'));
@@ -99,6 +100,7 @@ export const router = createBrowserRouter([
           { path: 'exits/:id', element: <ExitDetailPage /> },
           { path: 'requests', element: <RequestsPage /> },
           { path: 'tickets', element: <TicketsPage /> },
+          { path: 'queue', element: <QueuePage /> },
           { path: 'maintenance', element: <MaintenancePage /> },
           { path: 'activity', element: <ActivityPage /> },
           { path: 'settings/catalog', element: <CatalogPage /> },
