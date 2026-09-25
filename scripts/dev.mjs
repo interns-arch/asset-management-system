@@ -1,5 +1,6 @@
 // `npm run dev` — database, API (auto-restart) and web app (hot reload) in one command.
 import { spawn } from 'node:child_process';
+import http from 'node:http';
 import path from 'node:path';
 import { API_DIST, ensureDatabase, localUrl, publicUrl, ROOT, run, startPostgres, TSC, VITE } from './pg.mjs';
 
@@ -8,6 +9,23 @@ const API_PORT = process.env.API_PORT ?? '3000';
 // PORT is set explicitly so an inherited PORT (e.g. from a preview tool) cannot move the API.
 const PUBLIC_URL = publicUrl(5173);
 const env = { DATABASE_URL, NODE_ENV: 'development', PORT: API_PORT, API_PORT, ...(PUBLIC_URL ? { PUBLIC_URL } : {}) };
+
+// A second `npm run dev` would crash on the busy ports; point at the running copy instead.
+const running = await new Promise((resolve) => {
+  const req = http.get({ host: 'localhost', port: API_PORT, path: '/api/config', agent: false, timeout: 1500 }, (res) => {
+    res.resume();
+    resolve(res.statusCode === 200);
+  });
+  req.on('timeout', () => req.destroy());
+  req.on('error', () => resolve(false));
+});
+if (running) {
+  console.log('\n  ✔ The app is already running (started in another window).');
+  console.log('  ➜ Open http://localhost:5173  (admin@cartrend.test / Demo@1234)');
+  if (PUBLIC_URL) console.log(`  ➜ On a phone (same Wi-Fi): ${PUBLIC_URL}`);
+  console.log('  To restart it, close the other window first (or run: npx kill-port 3000 5173), then run npm run dev again.\n');
+  process.exit(0);
+}
 
 const db = await startPostgres();
 await ensureDatabase('eam');
