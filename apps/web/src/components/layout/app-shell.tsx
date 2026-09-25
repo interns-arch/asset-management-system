@@ -51,15 +51,11 @@ function useTheme() {
 function Brand() {
   const company = useCompanyName();
   return (
-    <div className="flex items-center gap-2.5 px-2">
-      <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm shadow-primary/30">
-        <svg viewBox="0 0 32 32" className="size-5" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M9 22 16 8l7 14M11.8 17h8.4" />
-        </svg>
-      </span>
-      <span className="leading-tight">
-        <span className="block truncate text-sm font-semibold">{company.short ?? 'Asset Portal'}</span>
-        <span className="block text-[11px] text-muted-foreground">{company.short ? 'Asset Portal' : 'Enterprise asset management'}</span>
+    <div className="flex items-center gap-2 px-1">
+      <img src="/logo.webp" alt={company.full ?? 'Car Trends'} className="h-11 w-auto shrink-0" />
+      <span className="min-w-0 border-l pl-2 leading-tight">
+        <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Asset</span>
+        <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Portal</span>
       </span>
     </div>
   );

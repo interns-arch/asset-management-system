@@ -46,24 +46,20 @@ export default function LoginPage() {
 
   return (
     <div className="grid min-h-dvh grid-cols-1 lg:grid-cols-[1.1fr_1fr]">
-      <div className="relative hidden overflow-hidden bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-800 p-12 text-white lg:flex lg:flex-col">
-        <div className="absolute -top-24 -right-24 size-96 rounded-full bg-white/10 blur-3xl" />
-        <div className="absolute -bottom-32 -left-16 size-96 rounded-full bg-violet-400/20 blur-3xl" />
-        <div className="relative flex items-center gap-2.5">
-          <span className="flex size-9 items-center justify-center rounded-lg bg-white/15 ring-1 ring-white/20">
-            <svg viewBox="0 0 32 32" className="size-5" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 22 16 8l7 14M11.8 17h8.4" />
-            </svg>
-          </span>
-          <span className="leading-tight">
-            <span className="block text-lg font-semibold">{company.full ?? 'Asset Portal'}</span>
-            {company.full && <span className="block text-xs text-indigo-100">Asset Portal</span>}
-          </span>
+      <div className="relative hidden overflow-hidden bg-gradient-to-br from-zinc-900 via-zinc-950 to-black p-12 text-white lg:flex lg:flex-col">
+        <div className="absolute -top-24 -right-24 size-96 rounded-full bg-red-600/25 blur-3xl" />
+        <div className="absolute -bottom-32 -left-16 size-96 rounded-full bg-zinc-500/15 blur-3xl" />
+        <div className="relative">
+          <img src="/logo.webp" alt={company.full ?? 'Car Trends'} className="h-auto w-full max-w-md drop-shadow-[0_8px_24px_rgba(220,38,38,0.25)]" />
+          <p className="mt-4 text-sm font-medium tracking-wide text-zinc-300">
+            {company.full ?? 'Asset Portal'}
+            {company.full && <span className="text-zinc-500"> · Asset Portal</span>}
+          </p>
         </div>
         <div className="relative mt-auto max-w-lg">
           <h1 className="text-4xl font-semibold leading-tight tracking-tight">Every asset your company owns, in one place.</h1>
-          <p className="mt-4 text-lg text-indigo-100">Laptops to forklifts, SIM cards to software licences — track who has what, where it is and what happened to it.</p>
-          <ul className="mt-10 space-y-4 text-indigo-50">
+          <p className="mt-4 text-lg text-zinc-300">Laptops to forklifts, SIM cards to software licences — track who has what, where it is and what happened to it.</p>
+          <ul className="mt-10 space-y-4 text-zinc-100">
             {[
               { icon: Boxes, text: 'Any asset type with your own fields — no code changes' },
               { icon: LogOut, text: 'Exit clearance that finds every asset a leaver holds' },
@@ -71,7 +67,7 @@ export default function LoginPage() {
               { icon: ShieldCheck, text: 'Roles, permissions and a tamper-proof history' },
             ].map((f) => (
               <li key={f.text} className="flex items-center gap-3">
-                <span className="flex size-8 items-center justify-center rounded-lg bg-white/10 ring-1 ring-white/15">
+                <span className="flex size-8 items-center justify-center rounded-lg bg-red-600/20 text-red-300 ring-1 ring-red-500/30">
                   <f.icon className="size-4" />
                 </span>
                 {f.text}
@@ -83,16 +79,9 @@ export default function LoginPage() {
 
       <div className="flex min-w-0 items-center justify-center p-6 sm:p-10">
         <div className="w-full min-w-0 max-w-sm">
-          <div className="mb-6 flex items-center gap-2.5 lg:hidden">
-            <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <svg viewBox="0 0 32 32" className="size-5" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 22 16 8l7 14M11.8 17h8.4" />
-              </svg>
-            </span>
-            <span className="leading-tight">
-              <span className="block font-semibold">{company.short ?? 'Asset Portal'}</span>
-              <span className="block text-xs text-muted-foreground">Asset Portal</span>
-            </span>
+          <div className="mb-8 lg:hidden">
+            <img src="/logo.webp" alt={company.full ?? 'Car Trends'} className="mx-auto h-auto w-full max-w-64" />
+            <p className="mt-2 text-center text-xs text-muted-foreground">{company.full ? `${company.full} · Asset Portal` : 'Asset Portal'}</p>
           </div>
           <h2 className="text-2xl font-semibold tracking-tight">Sign in</h2>
           <p className="mt-1 text-sm text-muted-foreground">Use your login ID, employee ID (e.g. CT000099) or email.</p>
