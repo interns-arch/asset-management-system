@@ -100,6 +100,9 @@ only sees their own assets and QR. The IT role has full access.
   and addresses never leave the computer, and card numbers are masked.
 - **Priority queue** — one worklist (`G Q`) of open tickets and requests to approve or fulfil,
   ordered Urgent → High → Medium → Low, then overdue, then oldest; also on the dashboard.
+- **Logins** — IT chooses the login ID, email and password (or generates a password) from the
+  person's page or Settings → Users. People sign in with the login ID, employee ID or email
+  (any letter case).
 - **Roles & permissions** — Admin and IT / Asset Manager (full access), HR, Manager, and
   Employee (view only: their own assets and QR, plus requests and tickets). All editable.
 

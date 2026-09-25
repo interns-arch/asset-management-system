@@ -6,6 +6,8 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Copy,
+  Eye,
+  EyeOff,
   KeyRound,
   LogOut,
   Mail,
@@ -27,7 +29,9 @@ import { AssetStatusBadge, EmployeeStatusBadge, EnumBadge } from '@/components/c
 import { LocalQrWarning, QRCode, useQrLinks } from '@/components/common/codes';
 import { useConfirm } from '@/components/common/confirm';
 import { DetailList, EmptyState, ErrorState, PageLoader } from '@/components/common/page';
+import { Field } from '@/components/common/form';
 import { EntityPicker } from '@/components/common/pickers';
+import { Input } from '@/components/ui/input';
 import { Timeline } from '@/components/common/timeline';
 import { Button } from '@/components/ui/button';
 import {
@@ -45,7 +49,7 @@ import {
 import { Avatar, Badge, Card, CardContent, CardHeader, CardTitle, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/primitives';
 import { AssetActionDialog, type AssetDialog } from '@/features/assets/asset-actions';
 import { useQuickAdd } from '@/features/quick-add/quick-add';
-import { api, errorMessage, type Page } from '@/lib/api';
+import { ApiError, api, errorMessage, type Page } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useCompanyName } from '@/lib/config';
 import { AssetIcon } from '@/lib/icons';
@@ -64,6 +68,7 @@ export default function EmployeeDetailPage() {
   const [dialog, setDialog] = useState<AssetDialog | null>(null);
   const [pickAsset, setPickAsset] = useState(false);
   const [credentials, setCredentials] = useState<Credentials | null>(null);
+  const [accessOpen, setAccessOpen] = useState(false);
   const q = useQuery({ queryKey: ['employee', id], queryFn: () => api.get<EmployeeDetail>(`/employees/${id}`), placeholderData: undefined });
   const history = useQuery({ queryKey: ['history', 'employee', id], queryFn: () => api.get<Page<HistoryEvent>>(`/employees/${id}/history`), enabled: !!q.data });
 
@@ -78,12 +83,12 @@ export default function EmployeeDetailPage() {
     onError: (err) => toast.error(errorMessage(err)),
   });
   const access = useMutation({
-    mutationFn: () => api.post<Credentials>(`/employees/${id}/access`, {}),
+    mutationFn: (body: AccessInput) => api.post<Credentials>(`/employees/${id}/access`, body),
     onSuccess: async (r) => {
       await Promise.all([refresh(), queryClient.invalidateQueries({ queryKey: ['users'] })]);
+      setAccessOpen(false);
       setCredentials(r);
     },
-    onError: (err) => toast.error(errorMessage(err)),
   });
   const disable = useMutation({
     mutationFn: (userId: string) => api.patch(`/users/${userId}`, { isActive: false }),
@@ -110,12 +115,9 @@ export default function EmployeeDetailPage() {
     <LoginPanel
       employee={e}
       busy={access.isPending || disable.isPending}
-      onGrant={async () => {
-        if (e.login?.isActive) {
-          const r = await confirm({ title: `Reset ${e.fullName}’s password?`, description: 'A new password is generated and they are signed out everywhere.', confirmText: 'Reset password' });
-          if (!r.confirmed) return;
-        }
-        access.mutate();
+      onGrant={() => {
+        access.reset();
+        setAccessOpen(true);
       }}
       onDisable={async () => {
         const r = await confirm({ title: `Turn off ${e.fullName}’s login?`, description: 'They will be signed out and can’t sign in until you give access again.', confirmText: 'Turn off', destructive: true });
@@ -370,6 +372,7 @@ export default function EmployeeDetailPage() {
         }}
       />
       <CredentialsDialog employee={e} credentials={credentials} onClose={() => setCredentials(null)} />
+      {accessOpen && <AccessDialog employee={e} saving={access.isPending} error={access.error} onSave={(body) => access.mutate(body)} onClose={() => setAccessOpen(false)} />}
     </div>
   );
 }
@@ -453,8 +456,15 @@ function LoginPanel({ employee: e, busy, onGrant, onDisable }: { employee: Emplo
           <p className="mt-0.5 text-xs text-muted-foreground">
             {active ? (
               <>
-                Signs in with <span className="font-mono font-medium text-foreground">{e.employeeCode}</span>
-                {e.login?.email ? <> or {e.login.email}</> : null}
+                Signs in with{' '}
+                {[e.login?.username, e.employeeCode, e.login?.email]
+                  .filter(Boolean)
+                  .map((v, i, all) => (
+                    <span key={v}>
+                      <span className="font-mono font-medium text-foreground">{v}</span>
+                      {i < all.length - 1 ? ' or ' : ''}
+                    </span>
+                  ))}
               </>
             ) : e.login ? (
               'Login is turned off'
@@ -472,7 +482,7 @@ function LoginPanel({ employee: e, busy, onGrant, onDisable }: { employee: Emplo
         {manage && e.status !== 'EXITED' && (
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
             <Button variant={active ? 'outline' : 'default'} onClick={onGrant} loading={busy} className="h-11 sm:h-9">
-              <KeyRound /> {active ? 'Reset password' : e.login ? 'Turn login back on' : 'Give login (view only)'}
+              <KeyRound /> {active ? 'Change login / password' : e.login ? 'Turn login back on' : 'Give login (view only)'}
             </Button>
             {active && (
               <Button variant="ghost" onClick={onDisable} disabled={busy} className="h-11 sm:h-9">
@@ -481,7 +491,7 @@ function LoginPanel({ employee: e, busy, onGrant, onDisable }: { employee: Emplo
             )}
           </div>
         )}
-        {!e.login && manage && <p className="text-xs text-muted-foreground">They’ll only see their own assets and QR. A password is generated for you to share.</p>}
+        {!e.login && manage && <p className="text-xs text-muted-foreground">They’ll only see their own assets and QR. You choose the login ID and password.</p>}
       </CardContent>
     </Card>
   );
@@ -489,9 +499,92 @@ function LoginPanel({ employee: e, busy, onGrant, onDisable }: { employee: Emplo
 
 interface Credentials {
   loginId: string;
+  employeeCode: string;
   email: string | null;
   password: string;
   created: boolean;
+}
+
+interface AccessInput {
+  username: string;
+  email: string;
+  password: string;
+}
+
+const generatePassword = () => {
+  const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes = crypto.getRandomValues(new Uint8Array(10));
+  const raw = Array.from(bytes, (b) => chars[b % chars.length]).join('');
+  return `${raw.slice(0, 5)}-${raw.slice(5)}`;
+};
+
+/** IT picks the login ID, email and password (or generates a password). */
+function AccessDialog({ employee: e, saving, error, onSave, onClose }: { employee: EmployeeDetail; saving: boolean; error: unknown; onSave: (v: AccessInput) => void; onClose: () => void }) {
+  const [username, setUsername] = useState(e.login?.username ?? '');
+  const [email, setEmail] = useState(e.login?.email ?? e.email ?? '');
+  const [password, setPassword] = useState('');
+  const [show, setShow] = useState(false);
+  const errors = error instanceof ApiError ? (error.errors ?? {}) : {};
+  const general = error && !Object.keys(errors).length ? errorMessage(error) : null;
+  const reset = !!e.login?.isActive;
+  const tooShort = password.length > 0 && password.length < 8;
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{reset ? 'Change login / password' : `Give ${e.fullName} a login`}</DialogTitle>
+          <DialogDescription>
+            They can sign in with the login ID, their employee ID <span className="font-mono">{e.employeeCode}</span>, or the email.
+          </DialogDescription>
+        </DialogHeader>
+        <form
+          className="grid gap-4"
+          onSubmit={(ev) => {
+            ev.preventDefault();
+            if (!tooShort) onSave({ username, email, password });
+          }}
+        >
+          <Field label="Login ID" error={errors.username} hint="Optional · e.g. amit.kumar — letters, numbers, dot, dash">
+            <Input value={username} onChange={(v) => setUsername(v.target.value.replace(/\s/g, ''))} placeholder={e.employeeCode} autoComplete="off" autoCapitalize="none" />
+          </Field>
+          <Field label="Email for sign-in" error={errors.email} hint="Optional · they can type this instead of the login ID">
+            <Input type="email" value={email} onChange={(v) => setEmail(v.target.value)} placeholder="name@cartrends.in" autoComplete="off" />
+          </Field>
+          <Field
+            label={reset ? 'New password' : 'Password'}
+            error={errors.password ?? (tooShort ? 'At least 8 characters' : undefined)}
+            hint={reset ? 'Leave blank to generate one · they are signed out everywhere' : 'At least 8 characters · leave blank to generate one'}
+          >
+            <div className="flex gap-2">
+              <Input type={show ? 'text' : 'password'} value={password} onChange={(v) => setPassword(v.target.value)} autoComplete="new-password" className="font-mono" />
+              <Button type="button" variant="outline" size="icon" aria-label={show ? 'Hide password' : 'Show password'} onClick={() => setShow(!show)}>
+                {show ? <EyeOff /> : <Eye />}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setPassword(generatePassword());
+                  setShow(true);
+                }}
+              >
+                Generate
+              </Button>
+            </div>
+          </Field>
+          {general && <p className="text-sm text-destructive">{general}</p>}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" loading={saving}>
+              <KeyRound /> {reset ? 'Save' : 'Create login'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 /** Shown once after giving a login: IT copies or shares it (e.g. on WhatsApp). */
@@ -499,7 +592,7 @@ function CredentialsDialog({ employee, credentials, onClose }: { employee: Emplo
   const company = useCompanyName();
   const links = useQrLinks();
   const text = credentials
-    ? `${company.short ?? 'Asset Portal'} — asset portal login for ${employee.fullName}\n${links.base}\nEmployee ID: ${credentials.loginId}\nPassword: ${credentials.password}\nPlease change your password after signing in.`
+    ? `${company.short ?? 'Asset Portal'} — asset portal login for ${employee.fullName}\n${links.base}\nLogin ID: ${credentials.loginId}${credentials.email ? ` (or ${credentials.email})` : ''}\nPassword: ${credentials.password}\nPlease change your password after signing in.`
     : '';
   const copy = async () => {
     try {
@@ -514,14 +607,20 @@ function CredentialsDialog({ employee, credentials, onClose }: { employee: Emplo
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>{credentials?.created ? 'Login created' : 'New password'}</DialogTitle>
-          <DialogDescription>Share this with {employee.fullName}. The password is shown only now.</DialogDescription>
+          <DialogDescription>Share this with {employee.fullName}. The password is shown only now — it is stored encrypted and can’t be looked up later.</DialogDescription>
         </DialogHeader>
         {credentials && (
           <div className="space-y-2 rounded-lg border bg-muted/40 p-3 text-sm">
             <div className="flex justify-between gap-3">
-              <span className="text-muted-foreground">Employee ID</span>
+              <span className="text-muted-foreground">Login ID</span>
               <span className="font-mono font-semibold">{credentials.loginId}</span>
             </div>
+            {credentials.loginId !== credentials.employeeCode && (
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">or employee ID</span>
+                <span className="font-mono">{credentials.employeeCode}</span>
+              </div>
+            )}
             {credentials.email && (
               <div className="flex justify-between gap-3">
                 <span className="text-muted-foreground">or email</span>

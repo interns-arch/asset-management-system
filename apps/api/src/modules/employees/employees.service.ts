@@ -163,7 +163,7 @@ export class EmployeesService {
     const [heldAssets, [login], exitCase, reports] = await Promise.all([
       this.assets(actor, id),
       db
-        .select({ id: users.id, email: users.email, isActive: users.isActive, roleName: roles.name, lastLoginAt: users.lastLoginAt })
+        .select({ id: users.id, email: users.email, username: users.username, isActive: users.isActive, roleName: roles.name, lastLoginAt: users.lastLoginAt })
         .from(users)
         .innerJoin(roles, eq(roles.id, users.roleId))
         .where(eq(users.employeeId, id)),
@@ -281,30 +281,34 @@ export class EmployeesService {
       const password = input.password ?? `${qrToken(4)}-${qrToken(4)}`;
       const passwordHash = await hashPassword(password);
       const [existing] = await db.select().from(users).where(eq(users.employeeId, id));
+      await this.auth.assertLoginFree({ username: input.username, email: input.email }, { userId: existing?.id, employeeId: id });
 
       let email: string | null;
+      let username: string | null;
       if (existing) {
-        email = existing.email;
+        email = input.email ?? existing.email;
+        username = input.username ?? existing.username;
         await db
           .update(users)
-          .set({ passwordHash, isActive: true, failedLogins: 0, lockedUntil: null, ...(input.roleId ? { roleId } : {}), updatedAt: new Date() })
+          .set({ passwordHash, email, username, isActive: true, failedLogins: 0, lockedUntil: null, ...(input.roleId ? { roleId } : {}), updatedAt: new Date() })
           .where(eq(users.id, existing.id));
         await this.auth.revokeUserSessions(existing.id);
       } else {
-        // Use their email as a second way to sign in, unless another login already has it.
-        const candidate = emp.email ?? emp.personalEmail;
-        const [taken] = candidate ? await db.select({ id: users.id }).from(users).where(eq(users.email, candidate)) : [];
+        // Without a chosen email, use theirs as a second way to sign in unless another login has it.
+        const candidate = input.email ?? emp.email ?? emp.personalEmail;
+        const [taken] = candidate && !input.email ? await db.select({ id: users.id }).from(users).where(sql`lower(${users.email}) = lower(${candidate})`) : [];
         email = candidate && !taken ? candidate : null;
-        await db.insert(users).values({ email, name: emp.fullName, passwordHash, roleId, employeeId: id });
+        username = input.username ?? null;
+        await db.insert(users).values({ email, username, name: emp.fullName, passwordHash, roleId, employeeId: id });
       }
       await this.history.record(actor, {
         entityType: 'EMPLOYEE',
         entityId: id,
         entityLabel: emp.fullName,
         action: existing ? 'LOGIN_RESET' : 'LOGIN_GRANTED',
-        summary: existing ? 'Portal password reset' : 'Portal login created',
+        summary: existing ? 'Portal login updated' : 'Portal login created',
       });
-      return { loginId: emp.employeeCode, email, password, created: !existing };
+      return { loginId: username ?? emp.employeeCode, employeeCode: emp.employeeCode, email, password, created: !existing, chosenPassword: !!input.password };
     });
   }
 

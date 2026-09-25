@@ -51,7 +51,7 @@ const code = z.preprocess(
 // ─── Auth ───────────────────────────────────────────────────────────────────
 /** Sign in with an email address or an employee code (e.g. CT000099). */
 export const loginSchema = z.object({
-  login: z.string().trim().min(1, 'Enter your email or employee ID').max(200),
+  login: z.string().trim().min(1, 'Enter your login ID, employee ID or email').max(200),
   password: z.string().min(1, 'Enter your password'),
 });
 export const changePasswordSchema = z.object({
@@ -313,30 +313,49 @@ export const maintenanceUpdateSchema = z.object({
 });
 
 // ─── Users & roles ──────────────────────────────────────────────────────────
+/** A login ID chosen by IT, used instead of (or as well as) the email / employee ID. */
+const loginId = z.preprocess(
+  blankToNull,
+  z
+    .string()
+    .trim()
+    .min(3, 'At least 3 characters')
+    .max(50)
+    .regex(/^[A-Za-z0-9._-]+$/, 'Use letters, numbers, dot, dash or underscore (no spaces or @)')
+    .nullable()
+    .optional(),
+);
+const newPassword = z.preprocess(blankToNull, z.string().min(8, 'At least 8 characters').max(200).nullable().optional());
+
 export const userCreateSchema = z
   .object({
     name: reqText(150),
+    username: loginId,
     email: optEmail,
     password: z.string().min(8, 'At least 8 characters').max(200),
     roleId: reqId,
     employeeId: optId,
     isActive: z.boolean().default(true),
   })
-  .refine((v) => !!v.email || !!v.employeeId, {
-    message: 'Enter an email or link an employee (they can sign in with their employee ID)',
-    path: ['email'],
+  .refine((v) => !!v.email || !!v.employeeId || !!v.username, {
+    message: 'Enter a login ID or email, or link an employee (they can sign in with their employee ID)',
+    path: ['username'],
   });
 /** Give an employee a portal login. Without a password one is generated and shown once. */
 export const employeeAccessSchema = z.object({
   roleId: optId,
-  password: z.preprocess(blankToNull, z.string().min(8, 'At least 8 characters').max(200).nullable().optional()),
+  username: loginId,
+  email: optEmail,
+  password: newPassword,
 });
 export const userUpdateSchema = z.object({
   name: reqText(150).optional(),
   roleId: reqId.optional(),
   employeeId: optId,
   isActive: z.boolean().optional(),
-  password: z.preprocess(blankToNull, z.string().min(8, 'At least 8 characters').max(200).nullable().optional()),
+  username: loginId,
+  email: optEmail,
+  password: newPassword,
 });
 export const roleSchema = z.object({
   name: reqText(80),

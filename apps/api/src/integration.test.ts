@@ -407,6 +407,40 @@ describe('priority queue', () => {
   });
 });
 
+describe('logins of your choice', () => {
+  const signIn = async (login: string, password: string) =>
+    (await fetch(`${base}/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-requested-with': 'XMLHttpRequest' }, body: JSON.stringify({ login, password }) })).status;
+
+  test('IT sets the login ID, email and password; any of them signs in', async () => {
+    const emp = await call('POST', '/employees', { employeeCode: 'T300', firstName: 'Chosen', lastName: 'Login', email: 'chosen@t.test' });
+    const r = await call('POST', `/employees/${emp.body.id}/access`, { username: 'chosen.login', email: 'Chosen.Login@T.test', password: 'MyOwnPass#1' }, 'it');
+    assert.equal(r.status, 200);
+    assert.equal(r.body.loginId, 'chosen.login');
+    assert.equal(r.body.password, 'MyOwnPass#1');
+    for (const id of ['chosen.login', 'CHOSEN.LOGIN', 'T300', 'chosen.login@t.test', 'CHOSEN.LOGIN@T.TEST']) assert.equal(await signIn(id, 'MyOwnPass#1'), 200, id);
+    assert.equal(await signIn('chosen.login', 'wrong-password'), 401);
+
+    // Login IDs are unique and cannot be another person's employee ID.
+    const other = await call('POST', '/employees', { employeeCode: 'T301', firstName: 'Other', lastName: 'Person' });
+    const dup = await call('POST', `/employees/${other.body.id}/access`, { username: 'Chosen.Login', password: 'Another#123' }, 'it');
+    assert.equal(dup.status, 400);
+    assert.ok(dup.body.errors.username);
+    const clash = await call('POST', `/employees/${other.body.id}/access`, { username: 'T300', password: 'Another#123' }, 'it');
+    assert.equal(clash.status, 400);
+    assert.equal((await call('POST', `/employees/${other.body.id}/access`, { username: 'x', password: 'short' }, 'it')).status, 400);
+  });
+
+  test('a user can be created with only a login ID', async () => {
+    const roleList = await call('GET', '/roles');
+    const roleId = roleList.body.find((x: { name: string }) => x.name === 'IT / Asset Manager').id;
+    const created = await call('POST', '/users', { name: 'Store Keeper', username: 'store1', password: 'Store#2026', roleId });
+    assert.equal(created.status, 201);
+    assert.equal(await signIn('store1', 'Store#2026'), 200);
+    const cleared = await call('PATCH', `/users/${created.body.id}`, { username: null });
+    assert.equal(cleared.status, 400);
+  });
+});
+
 describe('reconciliation', () => {
   test('an Airtel dump is matched to SIM records by connection or SIM number', async () => {
     const cat = await call('POST', '/categories', { name: 'Telecom', code: 'TEL' });

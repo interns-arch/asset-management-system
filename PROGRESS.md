@@ -27,6 +27,9 @@ Tracks the build milestones so work can resume after any interruption.
 - [x] 13. Reconciliation of Airtel and Salary Box dumps with notifications; single-company
        setup (Companies page removed, company filled in automatically) (2026-09-25)
 
+- [x] 14. Login ID, email and password chosen by IT; sign in with login ID, employee ID or
+       email in any case (2026-09-25)
+
 ## Possible next steps
 - AI assistant on top of the permission-checked API (the design already allows it)
 - Email notifications (SMTP) in addition to in-app notifications

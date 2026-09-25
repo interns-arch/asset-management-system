@@ -37,9 +37,11 @@ export class AuthService {
     const db = this.dbs.db;
     const id = login.trim();
     if (id.includes('@')) {
-      const [user] = await db.select().from(users).where(eq(users.email, id.toLowerCase())).limit(1);
+      const [user] = await db.select().from(users).where(sql`lower(${users.email}) = lower(${id})`).limit(1);
       return user;
     }
+    const [named] = await db.select().from(users).where(sql`lower(${users.username}) = lower(${id})`).limit(1);
+    if (named) return named;
     const [row] = await db
       .select({ user: users })
       .from(users)
@@ -47,6 +49,24 @@ export class AuthService {
       .where(sql`lower(${employees.employeeCode}) = lower(${id})`)
       .limit(1);
     return row?.user;
+  }
+
+  /** A login ID or email may belong to one login only, and a login ID may not be someone else's employee ID. */
+  async assertLoginFree(input: { username?: string | null; email?: string | null }, self: { userId?: string | null; employeeId?: string | null }) {
+    const db = this.dbs.db;
+    const errors: Record<string, string> = {};
+    if (input.username) {
+      const [user] = await db.select({ id: users.id }).from(users).where(sql`lower(${users.username}) = lower(${input.username}) and ${users.id} is distinct from ${self.userId ?? null}`);
+      const [emp] = await db.select({ id: employees.id }).from(employees).where(sql`lower(${employees.employeeCode}) = lower(${input.username}) and ${employees.id} is distinct from ${self.employeeId ?? null}`);
+      if (user) errors.username = 'This login ID is already taken';
+      else if (emp) errors.username = 'This is another employee’s ID — choose a different login ID';
+    }
+    if (input.email) {
+      const [user] = await db.select({ id: users.id }).from(users).where(sql`lower(${users.email}) = lower(${input.email}) and ${users.id} is distinct from ${self.userId ?? null}`);
+      if (user) errors.email = 'Another login already uses this email';
+    }
+    const first = Object.values(errors)[0];
+    if (first) throw badRequest(first, errors);
   }
 
   async login(login: string, password: string, meta: { ip?: string; userAgent?: string }) {

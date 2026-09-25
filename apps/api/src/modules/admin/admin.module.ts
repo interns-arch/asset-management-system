@@ -21,6 +21,7 @@ const publicUser = {
   id: users.id,
   name: users.name,
   email: users.email,
+  username: users.username,
   roleId: users.roleId,
   roleName: roles.name,
   employeeId: users.employeeId,
@@ -42,7 +43,7 @@ export class AdminService {
   async listUsers(q: Record<string, string>) {
     const p = listParams(q, { sort: 'name', dir: 'asc' });
     const like = p.search ? likePattern(p.search) : null;
-    const where = like ? or(ilike(users.name, like), ilike(users.email, like), ilike(roles.name, like)) : undefined;
+    const where = like ? or(ilike(users.name, like), ilike(users.email, like), ilike(users.username, like), ilike(roles.name, like)) : undefined;
     const db = this.dbs.db;
     const [items, [{ total }]] = await Promise.all([
       db
@@ -61,6 +62,7 @@ export class AdminService {
 
   async createUser(actor: Actor, input: UserCreateInput) {
     return this.dbs.tx(async (db) => {
+      await this.auth.assertLoginFree(input, { employeeId: input.employeeId });
       const [row] = await db
         .insert(users)
         .values({ ...input, passwordHash: await hashPassword(input.password) })
@@ -74,11 +76,14 @@ export class AdminService {
     return this.dbs.tx(async (db) => {
       const [before] = await db.select().from(users).where(eq(users.id, id)).for('update');
       if (!before) throw notFound('User');
+      await this.auth.assertLoginFree(input, { userId: id, employeeId: input.employeeId ?? before.employeeId });
       if (id === actor.userId && (input.isActive === false || (input.roleId && input.roleId !== before.roleId))) {
         throw badRequest('You cannot deactivate yourself or change your own role.');
       }
       const { password, ...rest } = input;
-      const changes = diffChanges(before, rest, { name: 'Name', roleId: 'Role', employeeId: 'Linked employee', isActive: 'Active' });
+      const after = { ...before, ...Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined)) };
+      if (!after.email && !after.username && !after.employeeId) throw badRequest('Keep a login ID, an email or a linked employee so they can still sign in', { username: 'Required' });
+      const changes = diffChanges(before, rest, { name: 'Name', username: 'Login ID', email: 'Email', roleId: 'Role', employeeId: 'Linked employee', isActive: 'Active' });
       const patch: Partial<typeof users.$inferInsert> = { ...rest, updatedAt: new Date() };
       if (password) {
         patch.passwordHash = await hashPassword(password);

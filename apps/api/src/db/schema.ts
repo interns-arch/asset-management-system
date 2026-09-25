@@ -162,6 +162,8 @@ export const users = pgTable('users', {
   id: pk(),
   // Optional: employees without an email sign in with their employee code.
   email: text('email').unique(),
+  /** Optional login ID chosen by IT (e.g. "amit.k"); matched case-insensitively. */
+  username: text('username'),
   name: text('name').notNull(),
   passwordHash: text('password_hash').notNull(),
   roleId: uuid('role_id')
@@ -176,7 +178,7 @@ export const users = pgTable('users', {
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
-});
+}, (t) => [uniqueIndex('users_username_lower_idx').on(sql`lower(${t.username})`), uniqueIndex('users_email_lower_idx').on(sql`lower(${t.email})`)]);
 
 export const sessions = pgTable(
   'sessions',

@@ -290,7 +290,7 @@ export interface EmployeeDetail extends Omit<Employee, 'assetCount' | 'openExitC
   assetsVerifiedByName: string | null;
   createdAt: string;
   assets: HeldAsset[];
-  login: { id: string; email: string | null; isActive: boolean; roleName: string; lastLoginAt: string | null } | null;
+  login: { id: string; email: string | null; username: string | null; isActive: boolean; roleName: string; lastLoginAt: string | null } | null;
   openExitCase: { id: string; caseNumber: string; lastWorkingDate: string } | null;
   exitCases: { id: string; caseNumber: string; status: ExitCaseStatus; lastWorkingDate: string }[];
   directReports: { id: string; fullName: string; designation: string | null }[];
@@ -452,6 +452,7 @@ export interface Notification {
 export interface UserRow {
   id: string;
   name: string;
+  username: string | null;
   email: string | null;
   roleId: string;
   roleName: string;
