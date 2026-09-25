@@ -316,7 +316,7 @@ export class EmployeesService {
   async create(actor: Actor, input: EmployeeInput) {
     await this.assertManager(null, input.managerId);
     return this.dbs.tx(async (db) => {
-      const [row] = await db.insert(employees).values(input).returning();
+      const [row] = await db.insert(employees).values({ ...input, companyId: input.companyId ?? (await this.dbs.defaultCompanyId()) }).returning();
       await this.history.record(actor, {
         entityType: 'EMPLOYEE',
         entityId: row.id,

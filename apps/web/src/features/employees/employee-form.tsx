@@ -91,9 +91,6 @@ export default function EmployeeForm({ open, onOpenChange, record, defaults }: F
       <Separator />
       <FormSection title="Organisation">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Company" error={e('companyId')}>
-            <EntityPicker kind="COMPANY" {...pick('companyId')} />
-          </Field>
           <Field label="Department" error={e('departmentId')}>
             <EntityPicker kind="DEPARTMENT" {...pick('departmentId')} />
           </Field>

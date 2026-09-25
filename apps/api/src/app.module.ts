@@ -12,6 +12,7 @@ import { EmployeesModule } from './modules/employees/employees.module';
 import { ExitModule } from './modules/exit/exit.module';
 import { InsightsModule } from './modules/insights/insights.module';
 import { OrgModule } from './modules/org/org.module';
+import { ReconciliationModule } from './modules/reconciliation/reconciliation.module';
 import { ServiceModule } from './modules/service/service.module';
 
 @Controller('health')
@@ -51,6 +52,7 @@ export class ConfigController {
     ServiceModule,
     InsightsModule,
     AdminModule,
+    ReconciliationModule,
   ],
   controllers: [HealthController, ConfigController],
 })

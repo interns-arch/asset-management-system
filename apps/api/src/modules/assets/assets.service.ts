@@ -448,6 +448,7 @@ export class AssetsService {
         .insert(assets)
         .values({
           ...core,
+          ownerCompanyId: core.ownerCompanyId ?? (await this.dbs.defaultCompanyId()),
           currency: core.currency ?? 'INR',
           assetTag,
           qrCode: qrToken(),

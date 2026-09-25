@@ -31,6 +31,7 @@ import {
   MAINTENANCE_TYPES,
   OWNERSHIP_TYPES,
   PRIORITIES,
+  RECON_SOURCES,
   REQUEST_STATUSES,
   TICKET_STATUSES,
   TICKET_TYPES,
@@ -602,4 +603,22 @@ export const notifications = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index('notifications_user_idx').on(t.userId, t.createdAt)],
+);
+
+/** One uploaded dump (Airtel / Salary Box) checked against the register; only the matched columns are kept. */
+export const reconciliationRuns = pgTable(
+  'reconciliation_runs',
+  {
+    id: pk(),
+    source: text('source', { enum: RECON_SOURCES }).notNull(),
+    fileName: text('file_name').notNull(),
+    rowCount: integer('row_count').notNull(),
+    repairedRows: integer('repaired_rows').notNull().default(0),
+    summary: jsonb('summary').$type<Record<string, number>>().notNull(),
+    items: jsonb('items').$type<unknown[]>().notNull(),
+    createdBy: uuid('created_by'),
+    createdByName: text('created_by_name'),
+    createdAt: createdAt(),
+  },
+  (t) => [index('reconciliation_runs_created_idx').on(t.source, t.createdAt)],
 );

@@ -3,9 +3,9 @@ import {
   Activity,
   Boxes,
   Briefcase,
-  Building2,
   CardSim,
   ClipboardList,
+  GitCompareArrows,
   LayoutDashboard,
   LifeBuoy,
   ListOrdered,
@@ -39,13 +39,13 @@ export const MAIN_NAV: NavItem[] = [
   { label: 'Requests', to: '/requests', icon: ClipboardList, perms: ['request:create', 'request:approve', 'request:fulfil'], shortcut: 'G R' },
   { label: 'Tickets', to: '/tickets', icon: LifeBuoy, perms: ['ticket:create', 'ticket:manage'], shortcut: 'G T' },
   { label: 'Maintenance', to: '/maintenance', icon: Wrench, perms: ['maintenance:manage', 'asset:view'], shortcut: 'G M' },
+  { label: 'Reconciliation', to: '/reconciliation', icon: GitCompareArrows, perms: ['asset:assign', 'employee:manage'] },
   { label: 'Activity log', to: '/activity', icon: Activity, perms: ['history:view'] },
   { label: 'Scan', to: '/scan', icon: ScanLine, perms: ['asset:view', 'employee:view'], shortcut: 'G S' },
 ];
 
 export const SETTINGS_NAV: NavItem[] = [
   { label: 'Asset catalog', to: '/settings/catalog', icon: Shapes, perms: ['catalog:manage'] },
-  { label: 'Companies', to: '/settings/companies', icon: Building2, perms: ['org:manage'] },
   { label: 'Departments', to: '/settings/departments', icon: Briefcase, perms: ['org:manage'] },
   { label: 'Locations', to: '/settings/locations', icon: MapPin, perms: ['org:manage'] },
   { label: 'Vendors', to: '/settings/vendors', icon: Truck, perms: ['org:manage'] },

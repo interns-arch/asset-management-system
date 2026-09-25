@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { asc } from 'drizzle-orm';
 import pg from 'pg';
 import * as schema from './schema';
 
@@ -44,6 +45,12 @@ export class DbService implements OnModuleDestroy {
     const current = this.als.getStore();
     if (current) return fn(current);
     return this.root.transaction((tx) => this.als.run(tx, () => fn(tx)));
+  }
+
+  /** The system runs for a single company; records created without one belong to it. */
+  async defaultCompanyId(): Promise<string | null> {
+    const [row] = await this.db.select({ id: schema.companies.id }).from(schema.companies).orderBy(asc(schema.companies.createdAt)).limit(1);
+    return row?.id ?? null;
   }
 
   async onModuleDestroy() {

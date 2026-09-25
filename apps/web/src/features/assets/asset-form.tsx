@@ -262,9 +262,6 @@ export default function AssetForm({ open, onOpenChange, record, defaults }: Form
                   ))}
                 </NativeSelect>
               </Field>
-              <Field label="Owner company" error={e('ownerCompanyId')}>
-                <EntityPicker kind="COMPANY" value={(form.watch('ownerCompanyId') as string) || null} onChange={(v) => form.setValue('ownerCompanyId', v ?? '', { shouldDirty: true })} />
-              </Field>
               <Field label="Vendor / supplier" error={e('vendorId')}>
                 <EntityPicker kind="VENDOR" value={(form.watch('vendorId') as string) || null} onChange={(v) => form.setValue('vendorId', v ?? '', { shouldDirty: true })} />
               </Field>

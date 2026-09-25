@@ -35,7 +35,7 @@ export async function createApp() {
     }),
   );
   app.use(cookieParser());
-  app.useBodyParser('json', { limit: '1mb' });
+  app.useBodyParser('json', { limit: '4mb' });
 
   // CSRF defence: browsers cannot send this custom header cross-site without a CORS preflight,
   // and the session cookie is SameSite=Lax.

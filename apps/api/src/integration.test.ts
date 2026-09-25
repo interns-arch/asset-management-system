@@ -407,6 +407,62 @@ describe('priority queue', () => {
   });
 });
 
+describe('reconciliation', () => {
+  test('an Airtel dump is matched to SIM records by connection or SIM number', async () => {
+    const cat = await call('POST', '/categories', { name: 'Telecom', code: 'TEL' });
+    const type = await call('POST', '/asset-types', { categoryId: cat.body.id, name: 'SIM Card', code: 'SIM', trackingMode: 'INDIVIDUAL' });
+    for (const label of ['Connection Number', 'SIM Number', 'Plan', 'Circle']) await call('POST', '/fields', { assetTypeId: type.body.id, label, type: 'text' });
+    const sim = (attributes: Record<string, string>) => call('POST', '/assets', { assetTypeId: type.body.id, name: 'Airtel SIM', status: 'AVAILABLE', attributes });
+    const good = await sim({ connection_number: '9289015775', sim_number: '8991102606586609110U', plan: 'INFINITY_299', circle: 'DL' });
+    await sim({ connection_number: '9289015771', sim_number: '8991102406331229169U', plan: 'OLD_PLAN', circle: 'DL' });
+    await sim({ connection_number: '9000000001', sim_number: '8991000000000000001U', plan: 'X', circle: 'DL' });
+    await call('POST', `/assets/${good.body.id}/assign`, { holderType: 'EMPLOYEE', holderId: ids.alice });
+
+    const rows = [
+      { connectionNumber: '9289015775', simNumber: '8991102606586609110', plan: 'infinity_299', circle: 'DL', status: 'Active', email: 'alice@t.test' },
+      { connectionNumber: '9289015771', simNumber: '8991102406331229169U', plan: 'INFINITY_299', circle: 'DL', status: 'Active' },
+      { connectionNumber: '9217396458', simNumber: '8991102606585611497U', plan: 'INFINITY_299', circle: 'DL', status: 'Active' },
+    ];
+    assert.equal((await call('POST', '/reconciliations', { source: 'AIRTEL', fileName: 'airtel.xlsx', rows }, 'bob')).status, 403);
+    const res = await call('POST', '/reconciliations', { source: 'AIRTEL', fileName: 'airtel.xlsx', rows }, 'it');
+    assert.equal(res.status, 201);
+    assert.deepEqual(
+      { ...res.body.summary, warnings: undefined },
+      { MATCHED: 1, MISMATCH: 1, MISSING_IN_SYSTEM: 1, MISSING_IN_DUMP: 1, INVALID: 0, warnings: undefined },
+    );
+    const run = await call('GET', `/reconciliations/${res.body.id}`, undefined, 'it');
+    const plan = run.body.items.find((i: { key: string }) => i.key === '9289015771');
+    assert.deepEqual(plan.issues.map((x: { field: string }) => x.field), ['plan']);
+
+    // The team is notified of every run.
+    const notes = await call('GET', '/notifications', undefined, 'admin');
+    assert.ok(JSON.stringify(notes.body).includes('Airtel connections check'));
+  });
+
+  test('a Salary Box dump is matched to employees and what they hold', async () => {
+    const rows = [
+      { employeeCode: 'T0001', name: 'Alice Rao', officialEmail: 'alice@t.test', laptop: null, simDetails: '9289015775' },
+      { employeeCode: 'T002', name: 'Bob Iyer', simDetails: '9289015771' },
+      { employeeCode: 'T999', name: 'Ghost Person' },
+    ];
+    const res = await call('POST', '/reconciliations', { source: 'SALARYBOX', fileName: 'salarybox.xlsx', rows }, 'it');
+    assert.equal(res.status, 201);
+    const run = await call('GET', `/reconciliations/${res.body.id}`, undefined, 'it');
+    const byKey = (k: string) => run.body.items.find((i: { key: string }) => i.key === k);
+    // Alice holds the SIM she declared; her ID is only written with an extra zero.
+    assert.equal(byKey('T001').status, 'MATCHED');
+    assert.ok(byKey('T001').issues.some((x: { label: string }) => /written differently/.test(x.label)));
+    // Bob declares a SIM that is not assigned to him.
+    assert.equal(byKey('T002').status, 'MISMATCH');
+    assert.equal(byKey('T999').status, 'MISSING_IN_SYSTEM');
+    assert.ok(run.body.summary.MISSING_IN_DUMP >= 1);
+    // Only the known columns are stored.
+    const stored = await call('POST', '/reconciliations', { source: 'SALARYBOX', fileName: 'x.xlsx', rows: [{ employeeCode: 'T002', name: 'Bob Iyer', aadhar: '123412341234' }] }, 'it');
+    const [raw] = (await dbs.root.execute<{ items: unknown }>(sql`select items from reconciliation_runs where id = ${stored.body.id}`)).rows;
+    assert.ok(!JSON.stringify(raw).includes('123412341234'));
+  });
+});
+
 describe('history', () => {
   test('history is append-only at the database level', async () => {
     // Drizzle wraps the PostgreSQL error; the trigger's message is on the cause.

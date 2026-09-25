@@ -93,6 +93,11 @@ only sees their own assets and QR. The IT role has full access.
 - **SIM register** — sidebar *SIM cards*: Connection Number, Billable Account, Circle, Plan and
   SIM Number for every SIM, with who holds it. *Employees → Phones & emails* lists official and
   personal phones and emails plus each person's company SIM; search finds people by SIM number.
+- **Reconciliation** — upload the Airtel connections export or the Salary Box employee export
+  (.xlsx). Each upload is checked against the SIM register / employees and the assets people hold,
+  saved as a report (matched, mismatched, not in system, not in file) and notified to the team.
+  The file is read in the browser and only the needed columns are sent; Aadhaar, PAN, bank details
+  and addresses never leave the computer, and card numbers are masked.
 - **Priority queue** — one worklist (`G Q`) of open tickets and requests to approve or fulfil,
   ordered Urgent → High → Medium → Low, then overdue, then oldest; also on the dashboard.
 - **Roles & permissions** — Admin and IT / Asset Manager (full access), HR, Manager, and
