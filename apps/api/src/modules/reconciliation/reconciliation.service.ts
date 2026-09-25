@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { desc, eq, inArray, ne } from 'drizzle-orm';
+import { desc, eq, ilike, inArray, ne } from 'drizzle-orm';
 import {
+  assetCreateSchema,
   type DumpRow,
   employeeCodeKey,
   extractIdentifiers,
@@ -14,10 +15,11 @@ import {
   type ReconUploadInput,
 } from '@eam/shared';
 import { type Actor, assertCan, can } from '../../common/actor';
-import { notFound } from '../../common/http';
+import { badRequest, notFound } from '../../common/http';
 import { DbService } from '../../db/db.service';
-import { assets, assetTypes, departments, employees, reconciliationRuns } from '../../db/schema';
+import { assets, assetTypes, departments, employees, reconciliationRuns, vendors } from '../../db/schema';
 import { NotificationsService } from '../../core/notifications.service';
+import { AssetsService } from '../assets/assets.service';
 
 export interface ReconIssue {
   field: string;
@@ -35,6 +37,8 @@ export interface ReconItem {
   subtitle: string | null;
   entity: { kind: 'ASSET' | 'EMPLOYEE'; id: string; label: string } | null;
   issues: ReconIssue[];
+  /** Airtel rows with no SIM record: what is needed to add it (and whom to assign it to). */
+  addSim?: { connectionNumber: string; simNumber: string | null; plan: string | null; circle: string | null; billableId: string | null; employeeId: string | null; employeeName: string | null };
 }
 
 const PERMISSION: Record<ReconSource, 'asset:assign' | 'employee:manage'> = { AIRTEL: 'asset:assign', SALARYBOX: 'employee:manage' };
@@ -54,11 +58,21 @@ type AssetRow = {
   typeCode: string;
 };
 
+function summarise(items: ReconItem[]) {
+  const summary: Record<string, number> = { MATCHED: 0, MISMATCH: 0, MISSING_IN_SYSTEM: 0, MISSING_IN_DUMP: 0, INVALID: 0, warnings: 0 };
+  for (const i of items) {
+    summary[i.status]++;
+    if (i.status === 'MATCHED' && i.issues.length) summary.warnings++;
+  }
+  return summary;
+}
+
 @Injectable()
 export class ReconciliationService {
   constructor(
     private readonly dbs: DbService,
     private readonly notifications: NotificationsService,
+    private readonly assets: AssetsService,
   ) {}
 
   private visibleSources(actor: Actor) {
@@ -98,11 +112,7 @@ export class ReconciliationService {
     const assetRows = await this.loadAssets();
     const items = input.source === 'AIRTEL' ? this.airtel(rows, assetRows, await this.loadEmployees()) : this.salaryBox(rows, assetRows, await this.loadEmployees());
 
-    const summary: Record<string, number> = { MATCHED: 0, MISMATCH: 0, MISSING_IN_SYSTEM: 0, MISSING_IN_DUMP: 0, INVALID: 0, warnings: 0 };
-    for (const i of items) {
-      summary[i.status]++;
-      if (i.status === 'MATCHED' && i.issues.length) summary.warnings++;
-    }
+    const summary = summarise(items);
     const [run] = await this.dbs.db
       .insert(reconciliationRuns)
       .values({ source: input.source, fileName: input.fileName, rowCount: rows.length, repairedRows: input.repairedRows, summary, items, createdBy: actor.userId, createdByName: actor.name })
@@ -116,6 +126,52 @@ export class ReconciliationService {
       link: `/reconciliation/${run.id}`,
     });
     return { id: run.id, summary };
+  }
+
+  /** Adds the chosen Airtel connections to the SIM register, assigned to the person they were matched to. */
+  async addSims(actor: Actor, runId: string, keys: string[]) {
+    assertCan(actor, 'asset:create');
+    assertCan(actor, 'asset:assign');
+    const run = await this.get(actor, runId);
+    if (run.source !== 'AIRTEL') throw badRequest('Only Airtel checks can add SIMs');
+    const db = this.dbs.db;
+    const [type] = await db.select({ id: assetTypes.id }).from(assetTypes).where(eq(assetTypes.code, 'SIM'));
+    if (!type) throw badRequest('Add a SIM Card asset type (code SIM) to the catalog first');
+    const [airtel] = await db.select({ id: vendors.id }).from(vendors).where(ilike(vendors.name, 'airtel%')).limit(1);
+
+    const wanted = new Set(keys);
+    const items = run.items as ReconItem[];
+    const results: { key: string; ok: boolean; error?: string }[] = [];
+    for (const item of items) {
+      if (!wanted.has(item.key) || !item.addSim) continue;
+      const a = item.addSim;
+      try {
+        const input = assetCreateSchema.parse({
+          assetTypeId: type.id,
+          name: 'Airtel Corporate SIM',
+          status: 'AVAILABLE',
+          serialNumber: a.simNumber,
+          ownership: 'SUBSCRIPTION',
+          vendorId: airtel?.id ?? null,
+          attributes: { connection_number: a.connectionNumber, sim_number: a.simNumber, plan: a.plan, circle: a.circle, billable_account: a.billableId, carrier: 'Airtel' },
+          assignTo: a.employeeId ? { holderType: 'EMPLOYEE', holderId: a.employeeId } : null,
+        });
+        const asset = await this.assets.create(actor, input);
+        item.status = 'MATCHED';
+        item.entity = { kind: 'ASSET', id: asset.id, label: `${asset.assetTag} · ${asset.holderName ?? 'Not assigned'}` };
+        item.issues = item.issues.filter((i) => i.field !== 'sim');
+        item.subtitle = `Added to the SIM register by ${actor.name}${a.employeeName ? ` and assigned to ${a.employeeName}` : ''}`;
+        delete item.addSim;
+        results.push({ key: item.key, ok: true });
+      } catch (err) {
+        const res = (err as { getResponse?: () => unknown }).getResponse?.();
+        const message = typeof res === 'object' && res && 'message' in res ? String((res as { message: unknown }).message) : (err as Error).message;
+        results.push({ key: item.key, ok: false, error: message });
+      }
+    }
+    const summary = summarise(items);
+    await db.update(reconciliationRuns).set({ items, summary }).where(eq(reconciliationRuns.id, runId));
+    return { results, added: results.filter((r) => r.ok).length, summary };
   }
 
   private async loadAssets(): Promise<AssetRow[]> {
@@ -169,6 +225,16 @@ export class ReconciliationService {
     }
     const byEmail = new Map<string, (typeof people)[number]>();
     for (const p of people) for (const e of [p.email, p.personalEmail]) if (e) byEmail.set(e.toLowerCase(), p);
+    // A number recorded on a person (official first, then personal) tells us whose connection it is.
+    const byPhone = new Map<string, { person: (typeof people)[number]; official: boolean }>();
+    for (const p of people.filter((x) => x.status !== 'EXITED')) {
+      const personal = normalizePhone(p.personalPhone);
+      if (personal && !byPhone.has(personal)) byPhone.set(personal, { person: p, official: false });
+    }
+    for (const p of people.filter((x) => x.status !== 'EXITED')) {
+      const official = normalizePhone(p.phone);
+      if (official) byPhone.set(official, { person: p, official: true });
+    }
 
     const items: ReconItem[] = [];
     const seen = new Set<string>();
@@ -188,7 +254,18 @@ export class ReconciliationService {
       const iccid = normalizeIccid(row.simNumber);
       const asset = byConn.get(conn) ?? (iccid ? byIccid.get(iccid) : undefined);
       if (!asset) {
-        items.push({ status: 'MISSING_IN_SYSTEM', key: conn, title: conn, subtitle: `Not in the SIM register${subtitle ? ` · ${subtitle}` : ''}`, entity: null, issues: [] });
+        const owner = byPhone.get(conn);
+        const person = owner?.person ?? (row.email ? byEmail.get(row.email.toLowerCase()) : undefined);
+        const addSim = { connectionNumber: conn, simNumber: row.simNumber, plan: row.plan, circle: row.circle, billableId: row.billableId, employeeId: person?.id ?? null, employeeName: person?.fullName ?? null };
+        if (person) {
+          const issues: ReconIssue[] = [
+            { field: 'sim', label: 'No SIM record yet', dump: conn, system: owner ? `${owner.official ? 'Official' : 'Personal'} phone of ${person.fullName}` : `Airtel email matches ${person.fullName}`, level: 'warning' },
+          ];
+          if (row.name && !same(row.name, person.fullName)) issues.push({ field: 'holder', label: 'Name on Airtel', dump: row.name, system: person.fullName, level: 'warning' });
+          items.push({ status: 'MATCHED', key: conn, title: conn, subtitle, entity: { kind: 'EMPLOYEE', id: person.id, label: `${person.fullName} (${person.code})` }, issues, addSim });
+        } else {
+          items.push({ status: 'MISSING_IN_SYSTEM', key: conn, title: conn, subtitle: `Not in the SIM register${subtitle ? ` · ${subtitle}` : ''}`, entity: null, issues: [], addSim });
+        }
         continue;
       }
       matched.add(asset.id);
@@ -336,7 +413,13 @@ export class ReconciliationService {
       ids.guids.forEach((v) => check(v, 'Laptop device ID', true));
       ids.deviceNames.forEach((v) => check(v, 'Laptop device name', true));
       ids.iccids.forEach((v) => check(v, 'SIM number', true));
-      ids.phones.filter((p) => p !== phone).forEach((v) => check(v, 'SIM connection', true));
+      const ownOfficial = normalizePhone(person.phone);
+      ids.phones
+        .filter((p) => p !== phone)
+        .forEach((v) => {
+          if (v === ownOfficial && !index.has(v)) issues.push({ field: 'asset', label: 'SIM not in register (their official phone)', dump: v, system: null, level: 'warning' });
+          else check(v, 'SIM connection', true);
+        });
       ids.serials.forEach((v) => check(v, 'Serial number', false));
       for (const a of heldBy(person.id)) {
         if (!confirmed.has(a.id)) issues.push({ field: 'asset', label: 'Not listed in Salary Box', dump: null, system: `${a.assetTag} · ${a.name}`, level: 'warning' });

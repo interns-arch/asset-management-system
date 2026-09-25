@@ -1,13 +1,17 @@
 import { RECON_SOURCE_LABELS, type ReconSource, type ReconStatus } from '@eam/shared';
-import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, ArrowLeft, CheckCircle2, Search } from 'lucide-react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { AlertTriangle, ArrowLeft, CardSim, CheckCircle2, Plus, Search } from 'lucide-react';
 import { useMemo } from 'react';
 import { Link, useParams } from 'react-router';
+import { toast } from 'sonner';
+import { useConfirm } from '@/components/common/confirm';
 import { EmptyState, ErrorState, PageHeader, PageLoader } from '@/components/common/page';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge, Card } from '@/components/ui/primitives';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
+import { invalidateAssetData, queryClient } from '@/lib/queries';
 import { useSearchBox, useUrlFilters } from '@/lib/url-state';
 import { cn, formatDateTime } from '@/lib/utils';
 import { STATUS_META } from './summary';
@@ -26,6 +30,7 @@ interface ReconItem {
   subtitle: string | null;
   entity: { kind: 'ASSET' | 'EMPLOYEE'; id: string; label: string } | null;
   issues: ReconIssue[];
+  addSim?: { connectionNumber: string; employeeId: string | null; employeeName: string | null };
 }
 interface ReconRun {
   id: string;
@@ -54,6 +59,19 @@ export default function ReconRunPage() {
   const { values: f, set } = useUrlFilters({ tab: '' });
   const [search, setSearch] = useSearchBox(f.search ?? '', (v) => set({ search: v }));
   const q = useQuery({ queryKey: ['reconciliation', id], queryFn: () => api.get<ReconRun>(`/reconciliations/${id}`) });
+  const { can } = useAuth();
+  const confirm = useConfirm();
+  const canAdd = can('asset:create') && can('asset:assign');
+  const add = useMutation({
+    mutationFn: (keys: string[]) => api.post<{ added: number; results: { key: string; ok: boolean; error?: string }[] }>(`/reconciliations/${id}/add-sims`, { keys }),
+    onSuccess: async (r) => {
+      await Promise.all([queryClient.invalidateQueries({ queryKey: ['reconciliation', id] }), queryClient.invalidateQueries({ queryKey: ['reconciliations'] }), invalidateAssetData()]);
+      const failed = r.results.filter((x) => !x.ok);
+      if (r.added) toast.success(`${r.added} SIM${r.added > 1 ? 's' : ''} added to the register`);
+      if (failed.length) toast.error(`${failed.length} could not be added`, { description: failed.slice(0, 3).map((f) => `${f.key}: ${f.error}`).join('\n') });
+    },
+    onError: (err) => toast.error(errorMessage(err)),
+  });
 
   const tab = TABS.find((t) => t.value === (f.tab ?? '')) ?? TABS[0];
   const items = useMemo(() => {
@@ -67,6 +85,16 @@ export default function ReconRunPage() {
   if (q.error || !q.data) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
   const run = q.data;
   const count = (t: (typeof TABS)[number]) => run.items.filter(t.match).length;
+  const addable = canAdd ? run.items.filter((i) => i.addSim) : [];
+  const assignable = addable.filter((i) => i.addSim?.employeeId).length;
+  const addAll = async () => {
+    const res = await confirm({
+      title: `Add ${addable.length} SIM${addable.length > 1 ? 's' : ''} to the register?`,
+      description: `Creates a SIM record for each connection from the Airtel file (number, SIM number, plan, circle, billable account).${assignable ? ` ${assignable} will be assigned to the person whose phone number matches.` : ''}`,
+      confirmText: 'Add SIMs',
+    });
+    if (res.confirmed) add.mutate(addable.map((i) => i.key));
+  };
 
   return (
     <div className="space-y-4">
@@ -78,6 +106,13 @@ export default function ReconRunPage() {
       <PageHeader
         title={`${RECON_SOURCE_LABELS[run.source]} check`}
         description={`${run.fileName} · ${run.rowCount} rows · ${formatDateTime(run.createdAt)}${run.createdByName ? ` · by ${run.createdByName}` : ''}${run.repairedRows ? ` · ${run.repairedRows} broken rows joined` : ''}`}
+        actions={
+          addable.length > 0 && (
+            <Button size="sm" onClick={addAll} loading={add.isPending}>
+              <CardSim /> Add {addable.length} to SIM register
+            </Button>
+          )
+        }
       />
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -125,7 +160,7 @@ export default function ReconRunPage() {
         ) : (
           <ul className="divide-y">
             {items.map((i, n) => (
-              <ItemRow key={`${i.key}-${n}`} item={i} />
+              <ItemRow key={`${i.key}-${n}`} item={i} onAddSim={canAdd && i.addSim ? () => add.mutate([i.key]) : undefined} adding={add.isPending && add.variables?.length === 1 && add.variables[0] === i.key} />
             ))}
           </ul>
         )}
@@ -134,7 +169,7 @@ export default function ReconRunPage() {
   );
 }
 
-function ItemRow({ item }: { item: ReconItem }) {
+function ItemRow({ item, onAddSim, adding }: { item: ReconItem; onAddSim?: () => void; adding?: boolean }) {
   const meta = STATUS_META[item.status];
   const link = item.entity ? (item.entity.kind === 'ASSET' ? `/assets/${item.entity.id}` : `/employees/${item.entity.id}`) : null;
   return (
@@ -147,11 +182,18 @@ function ItemRow({ item }: { item: ReconItem }) {
           </div>
           {item.subtitle && <p className="text-xs text-muted-foreground">{item.subtitle}</p>}
         </div>
-        {link && (
-          <Link to={link} className="shrink-0 text-xs font-medium text-primary hover:underline">
-            {item.entity!.label} →
-          </Link>
-        )}
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {link && (
+            <Link to={link} className="text-xs font-medium text-primary hover:underline">
+              {item.entity!.label} →
+            </Link>
+          )}
+          {onAddSim && (
+            <Button size="xs" variant="outline" onClick={onAddSim} loading={adding}>
+              <Plus /> {item.addSim?.employeeName ? `Add SIM & assign to ${item.addSim.employeeName}` : 'Add to SIM register'}
+            </Button>
+          )}
+        </div>
       </div>
       {item.issues.length > 0 && (
         <div className="mt-2 overflow-x-auto rounded-lg border">

@@ -473,6 +473,34 @@ describe('reconciliation', () => {
     assert.ok(JSON.stringify(notes.body).includes('Airtel connections check'));
   });
 
+  test('a connection saved as someone’s phone maps to them and can be added to the SIM register', async () => {
+    const emp = await call('POST', '/employees', { employeeCode: 'T400', firstName: 'Bhupender', lastName: 'Kumar', phone: '7303100510' });
+    const rows = [{ connectionNumber: '7303100510', simNumber: '8991102506406999999U', plan: 'Postpaid 349', circle: 'DL', status: 'Active', name: 'Bhupendra Kumar' }];
+    const first = await call('POST', '/reconciliations', { source: 'AIRTEL', fileName: 'airtel.xlsx', rows }, 'it');
+    let run = await call('GET', `/reconciliations/${first.body.id}`, undefined, 'it');
+    let item = run.body.items.find((i: { key: string }) => i.key === '7303100510');
+    assert.equal(item.status, 'MATCHED');
+    assert.equal(item.entity.id, emp.body.id);
+    assert.equal(item.addSim.employeeId, emp.body.id);
+
+    const added = await call('POST', `/reconciliations/${first.body.id}/add-sims`, { keys: ['7303100510'] }, 'it');
+    assert.equal(added.status, 200);
+    assert.equal(added.body.added, 1, JSON.stringify(added.body.results));
+    run = await call('GET', `/reconciliations/${first.body.id}`, undefined, 'it');
+    item = run.body.items.find((i: { key: string }) => i.key === '7303100510');
+    assert.equal(item.entity.kind, 'ASSET');
+    assert.equal(item.addSim, undefined);
+    const held = await call('GET', `/employees/${emp.body.id}`);
+    assert.ok(held.body.assets.some((a: { assetTag: string }) => a.assetTag.startsWith('SIM-')));
+
+    // The next upload matches the SIM record directly.
+    const second = await call('POST', '/reconciliations', { source: 'AIRTEL', fileName: 'airtel.xlsx', rows }, 'it');
+    run = await call('GET', `/reconciliations/${second.body.id}`, undefined, 'it');
+    item = run.body.items.find((i: { key: string }) => i.key === '7303100510');
+    assert.equal(item.status, 'MATCHED');
+    assert.equal(item.entity.kind, 'ASSET');
+  });
+
   test('a Salary Box dump is matched to employees and what they hold', async () => {
     const rows = [
       { employeeCode: 'T0001', name: 'Alice Rao', officialEmail: 'alice@t.test', laptop: null, simDetails: '9289015775' },
