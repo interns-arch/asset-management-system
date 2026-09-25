@@ -42,6 +42,13 @@ const LABELS: Record<string, string> = {
   notes: 'Notes',
 };
 
+
+/** Active SIM-card allocations of the employee in the outer query (for connection numbers). */
+const COMPANY_SIMS = sql.raw(`from allocations al
+  join assets a on a.id = al.asset_id
+  join asset_types t on t.id = a.asset_type_id
+  where al.employee_id = employees.id and al.status = 'ACTIVE' and t.code = 'SIM' and a.attributes ? 'connection_number'`);
+
 @Injectable()
 export class EmployeesService {
   constructor(
@@ -85,6 +92,7 @@ export class EmployeesService {
           ilike(employees.phone, like),
           ilike(employees.personalPhone, like),
           ilike(employees.designation, like),
+          sql`exists (select 1 ${COMPANY_SIMS} and (a.attributes->>'connection_number' ilike ${like} or a.attributes->>'sim_number' ilike ${like}))`,
         )!,
       );
     }
@@ -104,6 +112,8 @@ export class EmployeesService {
           email: employees.email,
           phone: employees.phone,
           personalPhone: employees.personalPhone,
+          personalEmail: employees.personalEmail,
+          companySims: sql<string[]>`coalesce((select array_agg(a.attributes->>'connection_number' order by al.assigned_at) ${COMPANY_SIMS}), '{}')`,
           designation: employees.designation,
           status: employees.status,
           joinDate: employees.joinDate,

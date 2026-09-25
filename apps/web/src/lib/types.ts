@@ -244,6 +244,8 @@ export interface Employee {
   email: string | null;
   phone: string | null;
   personalPhone: string | null;
+  personalEmail?: string | null;
+  companySims?: string[];
   designation: string | null;
   status: EmployeeStatus;
   joinDate: string | null;

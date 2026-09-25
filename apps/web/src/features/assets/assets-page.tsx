@@ -10,7 +10,7 @@ import {
 } from '@eam/shared';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRightLeft, Boxes, LayoutGrid, List, MapPin, Plus, Printer, ScanLine, Search, Tags, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { AssetStatusBadge, HolderLabel } from '@/components/common/badges';
 import { type Column, DataTable, Pagination } from '@/components/common/data-table';
@@ -80,7 +80,7 @@ export default function AssetsPage() {
     .filter((t) => !f.categoryId || t.categoryId === f.categoryId)
     .map((t) => ({ value: t.id, label: t.name, description: t.categoryName, icon: <AssetIcon icon={t.icon ?? t.categoryIcon} color={t.categoryColor} size="sm" /> }));
 
-  const customColumns = useMemo(() => (selectedType.data?.fields ?? []).filter((fd) => fd.showInTable).slice(0, 4), [selectedType.data]);
+  const customColumns = useMemo(() => (selectedType.data?.fields ?? []).filter((fd) => fd.showInTable).slice(0, 6), [selectedType.data]);
 
   const columns: Column<AssetListItem>[] = [
     {
@@ -134,10 +134,10 @@ export default function AssetsPage() {
       hideOnMobile: true,
       cell: (a) => (a.locationName ? <span className="inline-flex max-w-44 items-center gap-1 truncate text-muted-foreground"><MapPin className="size-3.5 shrink-0" />{a.locationName}</span> : <span className="text-muted-foreground">—</span>),
     },
-    ...customColumns.map<Column<AssetListItem>>((fd) => ({
+    ...customColumns.map<Column<AssetListItem>>((fd, i) => ({
       key: `f-${fd.key}`,
       header: fd.label,
-      hideOnMobile: true,
+      hideOnMobile: i > 0,
       cell: (a) => <span className="whitespace-nowrap">{fd.type === 'date' && typeof a.attributes[fd.key] === 'string' ? formatDate(a.attributes[fd.key] as string) : formatAttributeValue(fd, a.attributes[fd.key])}</span>,
     })),
     {
@@ -385,6 +385,16 @@ export default function AssetsPage() {
                         <p className="truncate text-xs text-muted-foreground">{a.typeName}</p>
                       </div>
                     </div>
+                    {customColumns.length > 0 && (
+                      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">
+                        {customColumns.map((fd) => (
+                          <Fragment key={fd.key}>
+                            <dt className="text-muted-foreground">{fd.label}</dt>
+                            <dd className="truncate font-medium">{fd.type === 'date' && typeof a.attributes[fd.key] === 'string' ? formatDate(a.attributes[fd.key] as string) : formatAttributeValue(fd, a.attributes[fd.key])}</dd>
+                          </Fragment>
+                        ))}
+                      </dl>
+                    )}
                     <div className="flex items-center justify-between gap-2">
                       <AssetStatusBadge status={a.status} />
                       <span className="text-xs text-muted-foreground">{relativeTime(a.updatedAt)}</span>

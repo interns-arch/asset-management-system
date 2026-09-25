@@ -36,7 +36,45 @@ export default function EmployeesPage() {
   const q = useQuery({ queryKey: ['employees', f], queryFn: () => api.get<Page<Employee>>('/employees', f) });
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  const columns: Column<Employee>[] = [
+  const contactsView = f.view === 'contacts';
+  const nameColumn: Column<Employee> = {
+    key: 'name',
+    header: 'Employee',
+    sortKey: 'name',
+    cell: (e) => (
+      <div className="flex min-w-48 items-center gap-3">
+        <Avatar name={e.fullName} />
+        <div className="min-w-0">
+          <div className="truncate font-medium">{e.fullName}</div>
+          <div className="truncate font-mono text-xs text-muted-foreground">{e.employeeCode}</div>
+        </div>
+      </div>
+    ),
+  };
+  const contactColumns: Column<Employee>[] = [
+    nameColumn,
+    { key: 'phone', header: 'Official phone', cell: (e) => <ContactLink kind="tel" value={e.phone} /> },
+    {
+      key: 'sims',
+      header: 'Company SIM',
+     
+      cell: (e) =>
+        e.companySims?.length ? (
+          <div className="flex flex-col">
+            {e.companySims.map((n) => (
+              <ContactLink key={n} kind="tel" value={n} />
+            ))}
+          </div>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+    { key: 'email', header: 'Official email', cell: (e) => <ContactLink kind="mailto" value={e.email} /> },
+    { key: 'personalPhone', header: 'Personal phone', cell: (e) => <ContactLink kind="tel" value={e.personalPhone} /> },
+    { key: 'personalEmail', header: 'Personal email', cell: (e) => <ContactLink kind="mailto" value={e.personalEmail} /> },
+  ];
+
+  const detailColumns: Column<Employee>[] = [
     {
       key: 'name',
       header: 'Employee',
@@ -84,6 +122,7 @@ export default function EmployeesPage() {
       ),
     },
   ];
+  const columns = contactsView ? contactColumns : detailColumns;
 
   return (
     <div>
@@ -122,6 +161,24 @@ export default function EmployeesPage() {
             </button>
           );
         })}
+        <div className="ml-auto flex shrink-0 gap-0.5 rounded-lg bg-muted p-0.5">
+          {[
+            { value: null, label: 'Details' },
+            { value: 'contacts', label: 'Phones & emails' },
+          ].map((v) => (
+            <button
+              key={v.label}
+              type="button"
+              onClick={() => set({ view: v.value }, { keepPage: true })}
+              className={cn(
+                'cursor-pointer rounded-md px-2.5 py-1 text-[13px] font-medium transition',
+                (f.view ?? null) === v.value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
       </div>
       <Card className="overflow-hidden">
         <div className="flex flex-wrap items-center gap-2 border-b p-3">
@@ -195,5 +252,14 @@ export default function EmployeesPage() {
         )}
       </Card>
     </div>
+  );
+}
+
+function ContactLink({ kind, value }: { kind: 'tel' | 'mailto'; value: string | null | undefined }) {
+  if (!value) return <span className="text-muted-foreground">—</span>;
+  return (
+    <a href={`${kind}:${kind === 'tel' ? value.replace(/[^\d+]/g, '') : value}`} onClick={(e) => e.stopPropagation()} className="whitespace-nowrap text-primary hover:underline">
+      {value}
+    </a>
   );
 }

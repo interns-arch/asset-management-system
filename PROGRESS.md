@@ -21,6 +21,9 @@ Tracks the build milestones so work can resume after any interruption.
 - [x] 11. Priority queue (tickets + requests, Urgent first, overdue flagged); handover / return
        photos saved with each assignment, including request fulfilment (2026-09-25)
 
+- [x] 12. SIM register in the billing-portal format; Employees "Phones & emails" view with
+       company SIMs; dark-mode native controls (2026-09-25)
+
 ## Possible next steps
 - AI assistant on top of the permission-checked API (the design already allows it)
 - Email notifications (SMTP) in addition to in-app notifications

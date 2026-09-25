@@ -308,7 +308,7 @@ async function main() {
   // Rahul Sharma: the full exit example — laptop, charger, SIM, access card, scooty, helmet, keys.
   await laptop(toEmp(rahul), 0);
   await charger(toEmp(rahul), { serial: 'DL65W-RS-0412' });
-  await add('SIM', 'Airtel Corporate SIM', { mobile_number: '+91 98201 45521', carrier: 'Airtel', plan: 'Corporate Unlimited 599', monthly_data_gb: 75 }, { holder: toEmp(rahul), vendorId: vendors.airtel, serial: '8991000900452211', cost: 0, ownership: 'SUBSCRIPTION' });
+  await add('SIM', 'Airtel Corporate SIM', { connection_number: '9289015775', billable_account: '1-5600565995407', circle: 'DL', plan: 'INFINITY_299_30GB_CORP_PLAN', sim_number: '89911026065866091100U', carrier: 'Airtel', monthly_data_gb: 30 }, { holder: toEmp(rahul), vendorId: vendors.airtel, serial: '89911026065866091100U', cost: 0, ownership: 'SUBSCRIPTION' });
   await add('ACC', 'Access Card — Bijwasan HO', { card_number: 'AC-BJW-30451', access_zones: ['Main Entrance', 'Office Floor', 'Parking'] }, { holder: toEmp(rahul), serial: null, cost: 350 });
   await add(
     'SCT',
@@ -338,7 +338,13 @@ async function main() {
     if (rand() < 0.45) await add('MON', pick(['Dell P2422H', 'LG 27UL500', 'Samsung S24']), { screen_size_inch: pick([24, 27]), resolution: pick(['1920x1080', '3840x2160']), panel: 'IPS' }, { holder: toEmp(id), cost: 16000 });
     if (rand() < 0.35) await add('HDS', pick(['Jabra Evolve2 65', 'Logitech Zone Vibe']), { wireless: true, noise_cancelling: rand() < 0.5 }, { holder: toEmp(id), cost: 9000 });
     if (rand() < 0.3) {
-      await add('SIM', 'Jio Corporate SIM', { mobile_number: `+91 9${int(100000000, 999999999)}`, carrier: 'Jio', plan: 'Business 399' }, { holder: toEmp(id), serial: `8991${int(100000000000, 999999999999)}`, cost: 0, ownership: 'SUBSCRIPTION' });
+      const iccid = `899110${int(1000000000000, 9999999999999)}U`;
+      await add(
+        'SIM',
+        'Airtel Corporate SIM',
+        { connection_number: `92${int(10000000, 99999999)}`, billable_account: '1-5600565995407', circle: 'DL', plan: 'Postpaid 349_30GB CORP PLAN_PKG_51320', sim_number: iccid, carrier: 'Airtel' },
+        { holder: toEmp(id), vendorId: vendors.airtel, serial: iccid, cost: 0, ownership: 'SUBSCRIPTION' },
+      );
     }
     await add('ACC', 'Access Card', { card_number: `AC-${int(10000, 99999)}`, access_zones: ['Main Entrance', 'Office Floor'] }, { holder: toEmp(id), serial: null, cost: 350 });
   }
