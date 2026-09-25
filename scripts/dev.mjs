@@ -1,6 +1,7 @@
 // `npm run dev` — database, API (auto-restart) and web app (hot reload) in one command.
 import { spawn } from 'node:child_process';
 import http from 'node:http';
+import net from 'node:net';
 import path from 'node:path';
 import { API_DIST, ensureDatabase, localUrl, publicUrl, ROOT, run, startPostgres, TSC, VITE } from './pg.mjs';
 
@@ -25,6 +26,18 @@ if (running) {
   if (PUBLIC_URL) console.log(`  ➜ On a phone (same Wi-Fi): ${PUBLIC_URL}`);
   console.log('  To restart it, close the other window first (or run: npx kill-port 3000 5173), then run npm run dev again.\n');
   process.exit(0);
+}
+const portBusy = (port) =>
+  new Promise((resolve) => {
+    const srv = net.createServer().once('error', () => resolve(true)).once('listening', () => srv.close(() => resolve(false)));
+    srv.listen(Number(port));
+  });
+for (const port of [API_PORT, '5173']) {
+  if (await portBusy(port)) {
+    console.error(`\n  ✖ Port ${port} is already in use by another program (maybe an old copy of this app).`);
+    console.error(`    Free it with:  npx kill-port ${port}   then run npm run dev again.\n`);
+    process.exit(1);
+  }
 }
 
 const db = await startPostgres();
