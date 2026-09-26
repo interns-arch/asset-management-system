@@ -13,7 +13,7 @@ import { AssetIcon } from '@/lib/icons';
 import type { SearchResults } from '@/lib/types';
 import { useDebounced } from '@/lib/url-state';
 import { Avatar } from '../ui/primitives';
-import { MAIN_NAV, QUICK_ADD, SETTINGS_NAV } from './nav';
+import { MAIN_NAV, navVisible, QUICK_ADD, SETTINGS_NAV } from './nav';
 
 /** Ctrl/⌘+K: search everything, jump anywhere, run any "+ Add" action. */
 export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
@@ -39,8 +39,8 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
     navigate(to);
   };
   const r = q.length >= 2 ? results.data : undefined;
-  const nav = [...MAIN_NAV, ...SETTINGS_NAV].filter((n) => !n.perms || can(...n.perms));
-  const adds = QUICK_ADD.filter((a) => can(...a.perms));
+  const nav = [...MAIN_NAV, ...SETTINGS_NAV].filter((n) => navVisible(n, can));
+  const adds = QUICK_ADD.filter((a) => (a.show ? a.show(can) : can(...a.perms)));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

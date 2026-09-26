@@ -3,12 +3,20 @@ import { lazy, Suspense } from 'react';
 import { createBrowserRouter, isRouteErrorResponse, Link, Navigate, Outlet, useLocation, useRouteError } from 'react-router';
 import { ConfirmProvider } from '@/components/common/confirm';
 import { AppShell } from '@/components/layout/app-shell';
+import { MAIN_NAV, navVisible } from '@/components/layout/nav';
 import { Button } from '@/components/ui/button';
 import { QuickAddProvider } from '@/features/quick-add/quick-add';
 import { useAuth } from '@/lib/auth';
 
 const LoginPage = lazy(() => import('@/features/auth/login-page'));
 const DashboardPage = lazy(() => import('@/features/dashboard/dashboard-page'));
+
+function HomeRoute() {
+  const { can } = useAuth();
+  if (navVisible(MAIN_NAV[0], can)) return <DashboardPage />;
+  const first = MAIN_NAV.find((n) => navVisible(n, can));
+  return <Navigate to={first?.to ?? '/employees'} replace />;
+}
 const AssetsPage = lazy(() => import('@/features/assets/assets-page'));
 const AssetDetailPage = lazy(() => import('@/features/assets/asset-detail-page'));
 const LabelsPage = lazy(() => import('@/features/assets/labels-page'));
@@ -92,7 +100,7 @@ export const router = createBrowserRouter([
         element: <RequireAuth />,
         errorElement: <RouteError />,
         children: [
-          { index: true, element: <DashboardPage /> },
+          { index: true, element: <HomeRoute /> },
           { path: 'assets', element: <AssetsPage /> },
           { path: 'assets/:id', element: <AssetDetailPage /> },
           { path: 'labels', element: <LabelsPage /> },

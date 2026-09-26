@@ -30,7 +30,7 @@ import { useCompanyName } from '@/lib/config';
 import { resolveCode } from '@/lib/scan';
 import { cn } from '@/lib/utils';
 import { CommandPalette } from './command-palette';
-import { MAIN_NAV, type NavItem, QUICK_ADD, SETTINGS_NAV } from './nav';
+import { MAIN_NAV, type NavItem, navVisible, QUICK_ADD, SETTINGS_NAV } from './nav';
 import { NotificationBell } from './notifications';
 
 function useTheme() {
@@ -63,7 +63,7 @@ function Brand() {
 
 function NavSection({ title, items, onNavigate }: { title?: string; items: NavItem[]; onNavigate?: () => void }) {
   const { can } = useAuth();
-  const visible = items.filter((i) => !i.perms || can(...i.perms));
+  const visible = items.filter((i) => navVisible(i, can));
   if (!visible.length) return null;
   return (
     <div className="space-y-0.5">
@@ -100,8 +100,12 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <nav className="flex-1 overflow-y-auto px-2.5 py-3 scrollbar-thin">
         <NavSection
           items={[
-            ...MAIN_NAV.map((n) => (n.to === '/assets' && me && !me.permissions.includes('asset:view') ? { ...n, label: 'My assets' } : n)),
-            ...(me?.employee ? [{ label: 'My QR & profile', to: `/employees/${me.employee.id}`, icon: QrCode }] : []),
+            ...MAIN_NAV.map((n) => {
+              if (!me || me.permissions.includes('employee:view')) return n;
+              // Plain employees: their own things only.
+              return n.to === '/assets' ? { ...n, label: 'My assets' } : n.to === '/' ? { ...n, label: 'Home' } : n.to === '/requests' ? { ...n, label: 'My requests' } : n.to === '/tickets' ? { ...n, label: 'My tickets' } : n;
+            }),
+            ...(me?.employee && !me.permissions.includes('employee:view') ? [{ label: 'My QR & profile', to: `/employees/${me.employee.id}`, icon: QrCode }] : []),
           ]}
           onNavigate={onNavigate}
         />
@@ -176,7 +180,7 @@ export function AppShell() {
   const [mobileNav, setMobileNav] = useState(false);
   const [help, setHelp] = useState(false);
   const [pwd, setPwd] = useState(false);
-  const adds = QUICK_ADD.filter((a) => can(...a.perms));
+  const adds = QUICK_ADD.filter((a) => (a.show ? a.show(can) : can(...a.perms)));
 
   useEffect(() => setMobileNav(false), [location.pathname]);
 
