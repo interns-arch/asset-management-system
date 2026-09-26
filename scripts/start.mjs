@@ -10,6 +10,13 @@ if (!fs.existsSync(path.join(API_DIST, 'main.js')) || !fs.existsSync(path.join(R
   process.exit(1);
 }
 
+// On a host like Render the bundled database would be wiped on every restart — require a real one.
+if (process.env.RENDER && !process.env.DATABASE_URL) {
+  console.error('✖ DATABASE_URL is not set. In Render: open the database → copy the Internal Database URL →');
+  console.error('  this web service → Environment → add DATABASE_URL → Save (it redeploys by itself).');
+  process.exit(1);
+}
+
 const PORT = process.env.PORT ?? '3000';
 const PUBLIC_URL = publicUrl(PORT);
 const env = { DATABASE_URL: process.env.DATABASE_URL ?? localUrl('eam'), NODE_ENV: 'production', PORT, ...(PUBLIC_URL ? { PUBLIC_URL } : {}) };
