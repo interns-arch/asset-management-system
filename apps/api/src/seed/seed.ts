@@ -339,7 +339,7 @@ async function main() {
   // Rahul Sharma: the full exit example — laptop, charger, SIM, access card, scooty, helmet, keys.
   await laptop(toEmp(rahul), 0);
   await charger(toEmp(rahul), { serial: 'DL65W-RS-0412' });
-  await add('SIM', 'Airtel Corporate SIM', { connection_number: '9289015775', billable_account: '1-5600565995407', circle: 'DL', plan: 'INFINITY_299_30GB_CORP_PLAN', sim_number: '89911026065866091100U', carrier: 'Airtel', monthly_data_gb: 30 }, { holder: toEmp(rahul), vendorId: vendors.airtel, serial: '89911026065866091100U', cost: 0, ownership: 'SUBSCRIPTION' });
+  await add('SIM', 'Airtel Corporate SIM', { connection_number: '9000000775', billable_account: '1-0000000000000', circle: 'DL', plan: 'INFINITY_299_30GB_CORP_PLAN', sim_number: '89910000000000000000U', carrier: 'Airtel', monthly_data_gb: 30 }, { holder: toEmp(rahul), vendorId: vendors.airtel, serial: '89910000000000000000U', cost: 0, ownership: 'SUBSCRIPTION' });
   await add('ACC', 'Access Card — Bijwasan HO', { card_number: 'AC-BJW-30451', access_zones: ['Main Entrance', 'Office Floor', 'Parking'] }, { holder: toEmp(rahul), serial: null, cost: 350 });
   await add(
     'SCT',
@@ -373,7 +373,7 @@ async function main() {
       await add(
         'SIM',
         'Airtel Corporate SIM',
-        { connection_number: `92${int(10000000, 99999999)}`, billable_account: '1-5600565995407', circle: 'DL', plan: 'Postpaid 349_30GB CORP PLAN_PKG_51320', sim_number: iccid, carrier: 'Airtel' },
+        { connection_number: `92${int(10000000, 99999999)}`, billable_account: '1-0000000000000', circle: 'DL', plan: 'Postpaid 349_30GB CORP PLAN_PKG_51320', sim_number: iccid, carrier: 'Airtel' },
         { holder: toEmp(id), vendorId: vendors.airtel, serial: iccid, cost: 0, ownership: 'SUBSCRIPTION' },
       );
     }

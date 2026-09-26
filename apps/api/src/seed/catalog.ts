@@ -55,8 +55,8 @@ export const CATALOG: SeedCategory[] = [
           { label: 'Storage Type', type: 'select', options: ['NVMe SSD', 'SSD', 'HDD'] },
           { label: 'Operating System', type: 'select', options: OS, showInTable: true },
           { label: 'Screen Size (inch)', type: 'number', min: 7, max: 21 },
-          { label: 'Device Name', type: 'text', placeholder: 'LAPTOP-H7K6BRU', helpText: 'Windows: Settings → System → About' },
-          { label: 'Device ID', type: 'text', isUnique: true, placeholder: 'F3D24A1C-4716-4E0A-9502-8A1269E160B5' },
+          { label: 'Device Name', type: 'text', placeholder: 'LAPTOP-AB12CD3', helpText: 'Windows: Settings → System → About' },
+          { label: 'Device ID', type: 'text', isUnique: true, placeholder: 'A1B2C3D4-1111-4222-8333-444455556666' },
         ],
       },
       {
@@ -157,10 +157,10 @@ export const CATALOG: SeedCategory[] = [
         icon: 'card-sim',
         fields: [
           { label: 'Connection Number', type: 'phone', required: true, isUnique: true, showInTable: true },
-          { label: 'Billable Account', type: 'text', showInTable: true, placeholder: '1-5600565995407' },
+          { label: 'Billable Account', type: 'text', showInTable: true, placeholder: '1-0000000000000' },
           { label: 'Circle', type: 'text', showInTable: true, placeholder: 'DL' },
           { label: 'Plan', type: 'text', showInTable: true },
-          { label: 'SIM Number', type: 'text', isUnique: true, showInTable: true, placeholder: '89911026065866091100U' },
+          { label: 'SIM Number', type: 'text', isUnique: true, showInTable: true, placeholder: '89910000000000000000U' },
           { label: 'Carrier', type: 'select', options: ['Airtel', 'Jio', 'Vi', 'BSNL'], required: true },
           { label: 'Monthly Data (GB)', type: 'number', min: 0 },
         ],

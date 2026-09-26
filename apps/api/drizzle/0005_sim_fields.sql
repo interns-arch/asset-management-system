@@ -11,9 +11,9 @@ INSERT INTO "field_definitions" ("asset_type_id", "key", "label", "type", "is_un
 SELECT t."id", f."key", f."label", 'text', f."uq", true, f."ord", f."ph"
 FROM "asset_types" t
 CROSS JOIN (VALUES
-  ('billable_account', 'Billable Account', false, 1, '1-5600565995407'),
+  ('billable_account', 'Billable Account', false, 1, '1-0000000000000'),
   ('circle', 'Circle', false, 2, 'DL'),
-  ('sim_number', 'SIM Number', true, 4, '89911026065866091100U')
+  ('sim_number', 'SIM Number', true, 4, '89910000000000000000U')
 ) AS f("key", "label", "uq", "ord", "ph")
 WHERE t."code" = 'SIM'
 ON CONFLICT DO NOTHING;

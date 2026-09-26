@@ -139,11 +139,11 @@ describe('one QR per person and view-only logins', () => {
   });
 
   test('IT gives an employee a login; they sign in with their employee ID and can only view', async () => {
-    const emp = await call('POST', '/employees', { employeeCode: 'ct000099', firstName: 'Anurag', lastName: 'Gupta', email: 'NA', phone: 'NA', personalPhone: '9971194578' });
+    const emp = await call('POST', '/employees', { employeeCode: 'ct000099', firstName: 'Test', lastName: 'Holder', email: 'NA', phone: 'NA', personalPhone: '9971194578' });
     assert.equal(emp.status, 201);
     assert.equal(emp.body.employeeCode, 'CT000099');
     assert.equal(emp.body.email, null, '"NA" is stored as empty');
-    const laptop = await newDrone({ name: 'Assigned to Anurag' });
+    const laptop = await newDrone({ name: 'Assigned to Test Holder' });
     await call('POST', `/assets/${laptop.body.id}/assign`, { holderType: 'EMPLOYEE', holderId: emp.body.id }, 'it');
 
     // IT has full access, including giving logins.
@@ -604,15 +604,15 @@ describe('reconciliation', () => {
     const type = await call('POST', '/asset-types', { categoryId: cat.body.id, name: 'SIM Card', code: 'SIM', trackingMode: 'INDIVIDUAL' });
     for (const label of ['Connection Number', 'SIM Number', 'Plan', 'Circle']) await call('POST', '/fields', { assetTypeId: type.body.id, label, type: 'text' });
     const sim = (attributes: Record<string, string>) => call('POST', '/assets', { assetTypeId: type.body.id, name: 'Airtel SIM', status: 'AVAILABLE', attributes });
-    const good = await sim({ connection_number: '9289015775', sim_number: '8991102606586609110U', plan: 'INFINITY_299', circle: 'DL' });
-    await sim({ connection_number: '9289015771', sim_number: '8991102406331229169U', plan: 'OLD_PLAN', circle: 'DL' });
+    const good = await sim({ connection_number: '9000000775', sim_number: '8991000000000000110U', plan: 'INFINITY_299', circle: 'DL' });
+    await sim({ connection_number: '9000000771', sim_number: '8991000000000000169U', plan: 'OLD_PLAN', circle: 'DL' });
     await sim({ connection_number: '9000000001', sim_number: '8991000000000000001U', plan: 'X', circle: 'DL' });
     await call('POST', `/assets/${good.body.id}/assign`, { holderType: 'EMPLOYEE', holderId: ids.alice });
 
     const rows = [
-      { connectionNumber: '9289015775', simNumber: '8991102606586609110', plan: 'infinity_299', circle: 'DL', status: 'Active', email: 'alice@t.test' },
-      { connectionNumber: '9289015771', simNumber: '8991102406331229169U', plan: 'INFINITY_299', circle: 'DL', status: 'Active' },
-      { connectionNumber: '9217396458', simNumber: '8991102606585611497U', plan: 'INFINITY_299', circle: 'DL', status: 'Active' },
+      { connectionNumber: '9000000775', simNumber: '8991000000000000110', plan: 'infinity_299', circle: 'DL', status: 'Active', email: 'alice@t.test' },
+      { connectionNumber: '9000000771', simNumber: '8991000000000000169U', plan: 'INFINITY_299', circle: 'DL', status: 'Active' },
+      { connectionNumber: '9000000458', simNumber: '8991000000000000497U', plan: 'INFINITY_299', circle: 'DL', status: 'Active' },
     ];
     assert.equal((await call('POST', '/reconciliations', { source: 'AIRTEL', fileName: 'airtel.xlsx', rows }, 'bob')).status, 403);
     const res = await call('POST', '/reconciliations', { source: 'AIRTEL', fileName: 'airtel.xlsx', rows }, 'it');
@@ -622,7 +622,7 @@ describe('reconciliation', () => {
       { MATCHED: 1, MISMATCH: 1, MISSING_IN_SYSTEM: 1, MISSING_IN_DUMP: 1, INVALID: 0, warnings: undefined },
     );
     const run = await call('GET', `/reconciliations/${res.body.id}`, undefined, 'it');
-    const plan = run.body.items.find((i: { key: string }) => i.key === '9289015771');
+    const plan = run.body.items.find((i: { key: string }) => i.key === '9000000771');
     assert.deepEqual(plan.issues.map((x: { field: string }) => x.field), ['plan']);
 
     // The team is notified of every run.
@@ -631,20 +631,20 @@ describe('reconciliation', () => {
   });
 
   test('a connection saved as someone’s phone maps to them and can be added to the SIM register', async () => {
-    const emp = await call('POST', '/employees', { employeeCode: 'T400', firstName: 'Bhupender', lastName: 'Kumar', phone: '7303100510' });
-    const rows = [{ connectionNumber: '7303100510', simNumber: '8991102506406999999U', plan: 'Postpaid 349', circle: 'DL', status: 'Active', name: 'Bhupendra Kumar' }];
+    const emp = await call('POST', '/employees', { employeeCode: 'T400', firstName: 'Phone', lastName: 'Owner', phone: '9000000510' });
+    const rows = [{ connectionNumber: '9000000510', simNumber: '8991000000000000999U', plan: 'Postpaid 349', circle: 'DL', status: 'Active', name: 'Phone Owner' }];
     const first = await call('POST', '/reconciliations', { source: 'AIRTEL', fileName: 'airtel.xlsx', rows }, 'it');
     let run = await call('GET', `/reconciliations/${first.body.id}`, undefined, 'it');
-    let item = run.body.items.find((i: { key: string }) => i.key === '7303100510');
+    let item = run.body.items.find((i: { key: string }) => i.key === '9000000510');
     assert.equal(item.status, 'MATCHED');
     assert.equal(item.entity.id, emp.body.id);
     assert.equal(item.addSim.employeeId, emp.body.id);
 
-    const added = await call('POST', `/reconciliations/${first.body.id}/add-sims`, { keys: ['7303100510'] }, 'it');
+    const added = await call('POST', `/reconciliations/${first.body.id}/add-sims`, { keys: ['9000000510'] }, 'it');
     assert.equal(added.status, 200);
     assert.equal(added.body.added, 1, JSON.stringify(added.body.results));
     run = await call('GET', `/reconciliations/${first.body.id}`, undefined, 'it');
-    item = run.body.items.find((i: { key: string }) => i.key === '7303100510');
+    item = run.body.items.find((i: { key: string }) => i.key === '9000000510');
     assert.equal(item.entity.kind, 'ASSET');
     assert.equal(item.addSim, undefined);
     const held = await call('GET', `/employees/${emp.body.id}`);
@@ -653,15 +653,15 @@ describe('reconciliation', () => {
     // The next upload matches the SIM record directly.
     const second = await call('POST', '/reconciliations', { source: 'AIRTEL', fileName: 'airtel.xlsx', rows }, 'it');
     run = await call('GET', `/reconciliations/${second.body.id}`, undefined, 'it');
-    item = run.body.items.find((i: { key: string }) => i.key === '7303100510');
+    item = run.body.items.find((i: { key: string }) => i.key === '9000000510');
     assert.equal(item.status, 'MATCHED');
     assert.equal(item.entity.kind, 'ASSET');
   });
 
   test('a Salary Box dump is matched to employees and what they hold', async () => {
     const rows = [
-      { employeeCode: 'T0001', name: 'Alice Rao', officialEmail: 'alice@t.test', laptop: null, simDetails: '9289015775' },
-      { employeeCode: 'T002', name: 'Bob Iyer', simDetails: '9289015771' },
+      { employeeCode: 'T0001', name: 'Alice Rao', officialEmail: 'alice@t.test', laptop: null, simDetails: '9000000775' },
+      { employeeCode: 'T002', name: 'Bob Iyer', simDetails: '9000000771' },
       { employeeCode: 'T999', name: 'Ghost Person' },
     ];
     const res = await call('POST', '/reconciliations', { source: 'SALARYBOX', fileName: 'salarybox.xlsx', rows }, 'it');

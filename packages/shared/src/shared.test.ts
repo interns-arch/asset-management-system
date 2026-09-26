@@ -91,7 +91,7 @@ test('reconcile: detects the source and joins rows split by line breaks', async 
   const table: unknown[][] = [
     H,
     ['SBAAAAAAAA', 'Asha Rao', 'CT000001', 9811111111, 'Flat 1'],
-    ['Sector 5, Delhi', 123412341234, 'ABCDE1234F', null, null, 'LAPTOP-AB12CD3', '9289015771 / 8991102406331229169U', 'Card 4421 4500 0098 9137'],
+    ['Sector 5, Delhi', 123412341234, 'ABCDE1234F', null, null, 'LAPTOP-AB12CD3', '9000000771 / 8991000000000000169U', 'Card 4421 4500 0098 9137'],
     ['SBBBBBBBBB', 'Ravi', 'CT0000122', 9822222222, 'One line', null, null, null, null, null, 'NA'],
   ];
   const found = detectSource(table)!;
@@ -100,7 +100,7 @@ test('reconcile: detects the source and joins rows split by line breaks', async 
   assert.equal(rows.length, 2);
   assert.equal(repaired, 1);
   assert.equal(rows[0].laptop, 'LAPTOP-AB12CD3');
-  assert.equal(rows[0].simDetails, '9289015771 / 8991102406331229169U');
+  assert.equal(rows[0].simDetails, '9000000771 / 8991000000000000169U');
   assert.equal(rows[0].other, 'Card •••• 9137');
   // Unmapped sensitive columns never make it into a record.
   assert.ok(!JSON.stringify(rows).includes('ABCDE1234F'));
@@ -110,10 +110,10 @@ test('reconcile: detects the source and joins rows split by line breaks', async 
 test('reconcile: identifiers and employee codes are normalised', async () => {
   const { employeeCodeKey, extractIdentifiers, normalizeIccid } = await import('./reconcile');
   assert.equal(employeeCodeKey('CT0000122'), employeeCodeKey('CT000122'));
-  assert.equal(normalizeIccid('8991102606586609110U'), normalizeIccid('8991102606586609110'));
-  const ids = extractIdentifiers('Dell - Device ID - F3D24A1C-4716-4E0A-9502-8A1269E160B5 / Sim No. - 8991102406331229169U / Ph. No. - 9289015771 / 8GW2633');
-  assert.deepEqual(ids.guids, ['F3D24A1C-4716-4E0A-9502-8A1269E160B5']);
-  assert.deepEqual(ids.iccids, ['8991102406331229169']);
-  assert.deepEqual(ids.phones, ['9289015771']);
-  assert.deepEqual(ids.serials, ['8GW2633']);
+  assert.equal(normalizeIccid('8991000000000000110U'), normalizeIccid('8991000000000000110'));
+  const ids = extractIdentifiers('Dell - Device ID - A1B2C3D4-1111-4222-8333-444455556666 / Sim No. - 8991000000000000169U / Ph. No. - 9000000771 / 8XY1234');
+  assert.deepEqual(ids.guids, ['A1B2C3D4-1111-4222-8333-444455556666']);
+  assert.deepEqual(ids.iccids, ['8991000000000000169']);
+  assert.deepEqual(ids.phones, ['9000000771']);
+  assert.deepEqual(ids.serials, ['8XY1234']);
 });
