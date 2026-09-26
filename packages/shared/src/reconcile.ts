@@ -196,7 +196,8 @@ export function extractIdentifiers(text: string | null | undefined) {
   const iccids = take(/89\d{16,20}[A-Z]?/gi, normalizeIccid);
   const guids = take(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, (s) => s.toUpperCase());
   const deviceNames = take(/\b(?:LAPTOP|DESKTOP)-[A-Z0-9]{4,15}\b/gi, (s) => s.toUpperCase());
-  const phones = take(/(?<!\d)(?:\+?91[\s-]?)?[6-9]\d{9}(?:\.0)?(?!\d)/g, normalizePhone);
+  // No lookbehind: older iOS Safari cannot parse it, which would break the whole app.
+  const phones = take(/(?:^|\D)(?:\+?91[\s-]?)?[6-9]\d{9}(?:\.0)?(?!\d)/g, normalizePhone);
   const serials = take(/\b(?=[A-Z0-9]*[A-Z])(?=[A-Z0-9]*\d)[A-Z0-9]{5,20}\b/gi, (s) => s.toUpperCase());
   return { iccids, guids, deviceNames, phones, serials };
 }
