@@ -170,7 +170,7 @@ export class CatalogService {
         categoryIcon: assetCategories.icon,
         categoryColor: assetCategories.color,
         assetCount: sql<number>`(select count(*)::int from assets a where a.asset_type_id = asset_types.id)`,
-        availableCount: sql<number>`(select count(*)::int from assets a where a.asset_type_id = asset_types.id and a.status = 'AVAILABLE')`,
+        availableCount: sql<number>`(select coalesce(sum(case when a.tracking_mode = 'QUANTITY' then a.available_quantity else 1 end), 0)::int from assets a where a.asset_type_id = asset_types.id and a.status = 'AVAILABLE')`,
         fieldCount: sql<number>`(select count(*)::int from field_definitions f where f.asset_type_id = asset_types.id and f.archived_at is null)`,
       })
       .from(assetTypes)
@@ -197,6 +197,7 @@ export class CatalogService {
 
   async createType(actor: Actor, input: AssetTypeInput) {
     await this.getCategory(input.categoryId);
+    if (input.consumable && input.trackingMode !== 'QUANTITY') throw badRequest('One-time items are tracked by quantity', { consumable: 'Needs quantity tracking' });
     return this.dbs.tx(async (db) => {
       const [row] = await db.insert(assetTypes).values(input).returning();
       await this.history.record(actor, {
@@ -221,12 +222,14 @@ export class CatalogService {
       if (n > 0 && input.categoryId !== before.categoryId) {
         throw conflict('Category cannot change once assets of this type exist.');
       }
+      if (input.consumable && input.trackingMode !== 'QUANTITY') throw badRequest('One-time items are tracked by quantity', { consumable: 'Needs quantity tracking' });
       const changes = diffChanges(before, input, {
         name: 'Name',
         code: 'Tag prefix',
         icon: 'Icon',
         description: 'Description',
         trackingMode: 'Tracking',
+        consumable: 'One-time (no return)',
         categoryId: 'Category',
       });
       if (!changes.length) return before;

@@ -276,6 +276,7 @@ export class AssetsService {
           assetTypeId: assets.assetTypeId,
           typeName: assetTypes.name,
           typeIcon: assetTypes.icon,
+          consumable: assetTypes.consumable,
           locationId: assets.locationId,
           locationName: locations.name,
         })

@@ -102,6 +102,9 @@ only sees their own assets and QR. The IT role has full access.
   sends it to IT. IT approves it — or sends it back with a note — under *Requests → New joiners*,
   then assigns everything in one go (or item by item with photos). *Mark joined* makes them Active;
   anything not yet given stays as an approved request.
+- **Joining kit & one-time items** — asset types can be *one-time (no return)*: joining kits,
+  stationery. *Give* takes one from stock for good; it shows under *Given, no return* on the
+  person and never in an exit checklist. New joiners get the joining kit ticked by default.
 - **Sidebar by designation** — IT/Admin see the operational pages; HR sees Employees, New joiners
   and Exits; managers see Dashboard, Employees and Requests; the CEO sees Leadership; employees
   see only their own assets, requests, tickets and QR.

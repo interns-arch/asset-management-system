@@ -23,6 +23,8 @@ export interface ActionAsset {
   availableQuantity?: number;
   holderType?: HolderType | null;
   holderName?: string | null;
+  /** One-time item: "Give" instead of "Assign", nothing to return. */
+  consumable?: boolean;
 }
 
 export type AssetDialog =
@@ -87,7 +89,8 @@ function AssignBody({ dialog, onClose, onDone }: { dialog: Extract<AssetDialog, 
   const [photos, setPhotos] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const action = useAction(onClose, onDone);
-  const allowed = pooled ? ASSIGNABLE_HOLDERS.filter((t) => t !== 'INVENTORY') : ASSIGNABLE_HOLDERS;
+  const give = !!dialog.asset.consumable;
+  const allowed = give ? (['EMPLOYEE', 'DEPARTMENT'] as const) : pooled ? ASSIGNABLE_HOLDERS.filter((t) => t !== 'INVENTORY') : ASSIGNABLE_HOLDERS;
   const from = transfer ? (dialog.allocation?.holderName ?? dialog.asset.holderName) : null;
 
   const submit = () => {
@@ -98,21 +101,22 @@ function AssignBody({ dialog, onClose, onDone }: { dialog: Extract<AssetDialog, 
         body: { holderType, holderId, quantity, expectedReturnDate: expected || null, notes, allocationId: transfer ? dialog.allocation?.id : undefined },
         photos: { assetId: dialog.asset.id, kind: 'HANDOVER', files: photos },
       },
-      { onSuccess: () => toast.success(transfer ? `${dialog.asset.assetTag} transferred` : `${dialog.asset.assetTag} assigned`) },
+      { onSuccess: () => toast.success(transfer ? `${dialog.asset.assetTag} transferred` : give ? `${dialog.asset.name} given — no return needed` : `${dialog.asset.assetTag} assigned`) },
     );
   };
 
   return (
     <>
       <DialogHeader>
-        <DialogTitle>{transfer ? 'Transfer asset' : 'Assign asset'}</DialogTitle>
+        <DialogTitle>{transfer ? 'Transfer asset' : give ? `Give ${dialog.asset.name}` : 'Assign asset'}</DialogTitle>
         <DialogDescription>
           {dialog.asset.assetTag} · {dialog.asset.name}
           {from && <> — currently with <span className="font-medium text-foreground">{from}</span></>}
         </DialogDescription>
       </DialogHeader>
       <div className="grid gap-4">
-        <Field label={transfer ? 'Transfer to' : 'Assign to'} required error={error ?? undefined}>
+        {give && <p className="rounded-md bg-emerald-50 px-3 py-2 text-xs text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">One-time item — it’s theirs to keep. Stock goes down; nothing to return.</p>}
+        <Field label={transfer ? 'Transfer to' : give ? 'Give to' : 'Assign to'} required error={error ?? undefined}>
           <HolderPicker
             holderType={holderType}
             holderId={holderId}
@@ -130,7 +134,7 @@ function AssignBody({ dialog, onClose, onDone }: { dialog: Extract<AssetDialog, 
             <Input type="number" min={1} max={dialog.asset.availableQuantity} value={quantity} onChange={(e) => setQuantity(Math.max(1, Number(e.target.value) || 1))} />
           </Field>
         )}
-        {holderType !== 'INVENTORY' && (
+        {holderType !== 'INVENTORY' && !give && (
           <Field label="Expected return" hint="Optional — for loans and temporary use">
             <Input type="date" value={expected} onChange={(e) => setExpected(e.target.value)} />
           </Field>
@@ -138,16 +142,18 @@ function AssignBody({ dialog, onClose, onDone }: { dialog: Extract<AssetDialog, 
         <Field label="Notes">
           <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Handover notes, accessories included…" />
         </Field>
-        <Field label="Handover photos">
-          <PhotoPicker files={photos} onChange={setPhotos} />
-        </Field>
+        {!give && (
+          <Field label="Handover photos">
+            <PhotoPicker files={photos} onChange={setPhotos} />
+          </Field>
+        )}
       </div>
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>
           Cancel
         </Button>
         <Button onClick={submit} loading={action.isPending}>
-          {transfer ? 'Transfer' : 'Assign'}
+          {transfer ? 'Transfer' : give ? 'Give' : 'Assign'}
         </Button>
       </DialogFooter>
     </>

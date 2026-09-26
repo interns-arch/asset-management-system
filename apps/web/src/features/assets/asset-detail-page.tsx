@@ -66,7 +66,8 @@ export default function AssetDetailPage() {
   );
   const primary = actions.filter((x) => PRIMARY.includes(x));
   const secondary = actions.filter((x) => !PRIMARY.includes(x));
-  const actionAsset = { id: a.id, assetTag: a.assetTag, name: a.name, trackingMode: a.trackingMode, availableQuantity: a.availableQuantity, holderType: a.holderType, holderName: a.holderName };
+  const consumable = !!a.type.consumable;
+  const actionAsset = { id: a.id, assetTag: a.assetTag, name: a.name, trackingMode: a.trackingMode, availableQuantity: a.availableQuantity, holderType: a.holderType, holderName: a.holderName, consumable };
 
   const runAction = (action: LifecycleAction, allocation?: Allocation) => {
     if (action === 'assign') setDialog({ kind: 'assign', asset: actionAsset });
@@ -110,6 +111,7 @@ export default function AssetDetailPage() {
                   {a.type.name} · {a.category.name}
                 </span>
                 {pooled && <Badge tone="cyan">Tracked by quantity</Badge>}
+                {consumable && <Badge tone="green">One-time — no return</Badge>}
               </div>
             </div>
           </div>
@@ -118,8 +120,8 @@ export default function AssetDetailPage() {
               const Icon = x === 'assign' ? UserPlus : x === 'transfer' ? ArrowRightLeft : Undo2;
               return (
                 <Button key={x} size="sm" variant={x === 'assign' ? 'default' : 'outline'} onClick={() => runAction(x)} disabled={pooled && x !== 'assign' && a.activeAllocations.length > 1}>
-                  <Icon /> {LIFECYCLE[x].label}
-                  {pooled && x === 'assign' ? ' units' : ''}
+                  <Icon /> {consumable && x === 'assign' ? 'Give' : LIFECYCLE[x].label}
+                  {pooled && x === 'assign' && !consumable ? ' units' : ''}
                 </Button>
               );
             })}
@@ -286,7 +288,7 @@ export default function AssetDetailPage() {
         <div className="space-y-5">
           <Card>
             <CardHeader>
-              <CardTitle>{pooled ? 'Stock & allocations' : 'Custody'}</CardTitle>
+              <CardTitle>{consumable ? 'Stock' : pooled ? 'Stock & allocations' : 'Custody'}</CardTitle>
             </CardHeader>
             <CardContent>
               {pooled ? (
@@ -294,12 +296,12 @@ export default function AssetDetailPage() {
                   <div>
                     <div className="flex items-end justify-between">
                       <span className="text-2xl font-semibold tabular">{a.availableQuantity}</span>
-                      <span className="text-xs text-muted-foreground">of {a.quantity} available</span>
+                      <span className="text-xs text-muted-foreground">{consumable ? `left of ${a.quantity}` : `of ${a.quantity} available`}</span>
                     </div>
                     <Progress value={a.quantity ? (a.availableQuantity / a.quantity) * 100 : 0} className="mt-2" indicatorClassName="bg-emerald-500" />
                   </div>
                   {a.activeAllocations.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No units issued.</p>
+                    <p className="text-sm text-muted-foreground">{consumable ? 'Given items are kept by the person — see Assignments for who got one.' : 'No units issued.'}</p>
                   ) : (
                     <ul className="max-h-80 divide-y overflow-y-auto scrollbar-thin">
                       {a.activeAllocations.map((al) => (
@@ -430,7 +432,7 @@ function AllocationHistory({ assetId }: { assetId: string }) {
                 </Badge>
               ) : (
                 <span className="text-xs">
-                  {humanize(al.status)}
+                  {al.status === 'CONSUMED' ? 'Given (no return)' : humanize(al.status)}
                   {al.returnCondition ? ` · ${humanize(al.returnCondition).toLowerCase()}` : ''}
                   {al.endNotes ? <span className="block text-muted-foreground">{al.endNotes}</span> : null}
                 </span>

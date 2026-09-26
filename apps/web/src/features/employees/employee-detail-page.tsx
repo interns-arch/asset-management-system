@@ -5,6 +5,7 @@ import {
   Boxes,
   CheckCircle2,
   ClipboardCheck,
+  Gift,
   KeyRound,
   LogOut,
   Mail,
@@ -319,6 +320,7 @@ export default function EmployeeDetailPage() {
                 <TabsList>
                   <TabsTrigger value="history">History</TabsTrigger>
                   <TabsTrigger value="exits">Exit cases ({e.exitCases.length})</TabsTrigger>
+                  <TabsTrigger value="given">Given, no return ({e.given.length})</TabsTrigger>
                 </TabsList>
               </div>
               <TabsContent value="history" className="p-5">
@@ -336,6 +338,24 @@ export default function EmployeeDetailPage() {
                           <span className="flex-1 text-muted-foreground">Last working day {formatDate(x.lastWorkingDate)}</span>
                           <EnumBadge value={x.status} tones={EXIT_CASE_TONE} />
                         </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </TabsContent>
+              <TabsContent value="given">
+                {!e.given.length ? (
+                  <EmptyState icon={Gift} title="Nothing given yet" description="One-time items like the joining kit show here — they’re theirs to keep." />
+                ) : (
+                  <ul className="divide-y">
+                    {e.given.map((g) => (
+                      <li key={g.allocationId} className="flex items-center gap-3 px-5 py-3 text-sm">
+                        <AssetIcon icon={g.typeIcon ?? g.categoryIcon} color={g.categoryColor} size="sm" />
+                        <Link to={`/assets/${g.assetId}`} className="min-w-0 flex-1 truncate font-medium hover:text-primary hover:underline">
+                          {g.quantity > 1 ? `${g.quantity} × ` : ''}
+                          {g.name}
+                        </Link>
+                        <span className="whitespace-nowrap text-xs text-muted-foreground">Given {formatDate(g.assignedAt)}</span>
                       </li>
                     ))}
                   </ul>

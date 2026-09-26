@@ -157,7 +157,7 @@ async function main() {
       await catalog.createField(admin, { ...f, categoryId: cat.id, required: f.required ?? false, isUnique: f.isUnique ?? false, showInTable: f.showInTable ?? false, filterable: true, options: f.options ?? null });
     }
     for (const t of c.types) {
-      const type = await catalog.createType(admin, { categoryId: cat.id, name: t.name, code: t.code, icon: t.icon, description: t.description ?? null, trackingMode: t.trackingMode ?? 'INDIVIDUAL' });
+      const type = await catalog.createType(admin, { categoryId: cat.id, name: t.name, code: t.code, icon: t.icon, description: t.description ?? null, trackingMode: t.trackingMode ?? 'INDIVIDUAL', consumable: t.consumable ?? false });
       types[t.code] = { id: type.id, trackingMode: type.trackingMode };
       for (const f of t.fields ?? []) {
         await catalog.createField(admin, { ...f, assetTypeId: type.id, required: f.required ?? false, isUnique: f.isUnique ?? false, showInTable: f.showInTable ?? false, filterable: true, options: f.options ?? null });
@@ -419,6 +419,7 @@ async function main() {
   const gloves = await add('GLV', 'Nitrile Gloves (pairs)', { glove_type: 'Nitrile' }, { quantity: 500, vendorId: vendors.karam, serial: null, cost: 15000, locationId: pune });
   await allocation.assign(admin, gloves, { holderType: 'DEPARTMENT', holderId: depts.logistics, quantity: 120 });
   await add('STN', 'Welcome Stationery Kit', { unit: 'Kit' }, { quantity: 80, serial: null, cost: 24000, locationId: itStore });
+  await add('JKT', 'Joining Kit', { contents: 'Bag, T-shirt, diary, pen, lanyard' }, { quantity: 40, serial: null, cost: 0, locationId: itStore });
   await add('INV', 'USB-C to HDMI Adapter', { sku: 'ADP-UC-HDMI' }, { quantity: 40, serial: null, cost: 32000, locationId: itStore });
 
   // A warehouse worker with no email: signs in with his employee ID and only sees his own kit.

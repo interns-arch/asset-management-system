@@ -57,10 +57,17 @@ export class AllocationService {
     return this.dbs.db.select().from(allocations).where(eq(allocations.assetId, assetId)).orderBy(desc(allocations.assignedAt));
   }
 
-  private async insertAllocation(actor: Actor, asset: AssetRow, holder: ResolvedHolder, quantity: number, notes?: string | null, expectedReturnDate?: string | null) {
+  /** One-time items (joining kit, stationery) are given away: no custody to return. */
+  private async isConsumable(assetTypeId: string) {
+    const [t] = await this.dbs.db.select({ consumable: assetTypes.consumable }).from(assetTypes).where(eq(assetTypes.id, assetTypeId));
+    return !!t?.consumable;
+  }
+
+  private async insertAllocation(actor: Actor, asset: AssetRow, holder: ResolvedHolder, quantity: number, notes?: string | null, expectedReturnDate?: string | null, consumed = false) {
     const [alloc] = await this.dbs.db
       .insert(allocations)
       .values({
+        ...(consumed ? { status: 'CONSUMED' as const, endedAt: new Date(), endedBy: actor.userId, endedByName: actor.name } : {}),
         assetId: asset.id,
         holderType: holder.holderType,
         ...holder.columns,
@@ -99,6 +106,7 @@ export class AllocationService {
       const holder = await this.holders.resolve(input.holderType, input.holderId);
       const toInventory = input.holderType === 'INVENTORY';
       let alloc: AllocationRow;
+      let consumed = false;
 
       if (asset.trackingMode === 'QUANTITY') {
         if (toInventory) throw badRequest('Quantity-tracked assets are stocked at a location; assign units to a holder instead.');
@@ -106,14 +114,16 @@ export class AllocationService {
           throw conflict(`Cannot assign an asset that is ${label(asset.status)}.`);
         }
         const qty = input.quantity ?? 1;
-        if (qty > asset.availableQuantity) throw conflict(`Only ${asset.availableQuantity} of ${asset.quantity} available.`);
-        alloc = await this.insertAllocation(actor, asset, holder, qty, input.notes, input.expectedReturnDate);
+        if (qty > asset.availableQuantity) throw conflict(asset.availableQuantity ? `Only ${asset.availableQuantity} of ${asset.quantity} available.` : `${asset.name} is out of stock — add more stock first.`);
+        consumed = await this.isConsumable(asset.assetTypeId);
+        alloc = await this.insertAllocation(actor, asset, holder, qty, input.notes, consumed ? null : input.expectedReturnDate, consumed);
         const remaining = asset.availableQuantity - qty;
         await this.dbs.db
           .update(assets)
           .set({
             availableQuantity: remaining,
-            status: remaining === 0 ? 'ASSIGNED' : 'AVAILABLE',
+            // Stock of a one-time item stays "available" (it's never out with anyone), even at 0 left.
+            status: remaining === 0 && !consumed ? 'ASSIGNED' : 'AVAILABLE',
             version: sql`${assets.version} + 1`,
             updatedAt: new Date(),
           })
@@ -122,8 +132,8 @@ export class AllocationService {
           entityType: 'ASSET',
           entityId: asset.id,
           entityLabel: `${asset.assetTag} · ${asset.name}`,
-          action: 'ASSIGNED',
-          summary: `${qty} × ${asset.name} assigned to ${holder.name}`,
+          action: consumed ? 'ISSUED' : 'ASSIGNED',
+          summary: consumed ? `${qty} × ${asset.name} given to ${holder.name} (no return)` : `${qty} × ${asset.name} assigned to ${holder.name}`,
           employeeId: holder.columns.employeeId,
           metadata: { allocationId: alloc.id, holderType: holder.holderType, holderId: holder.holderId, quantity: qty },
         });
@@ -157,7 +167,7 @@ export class AllocationService {
         });
       }
 
-      await this.afterNewEmployeeHolder(actor, asset, holder, alloc);
+      await this.afterNewEmployeeHolder(actor, asset, holder, alloc, consumed);
       return alloc;
     });
   }
@@ -361,16 +371,18 @@ export class AllocationService {
   }
 
   /** New assignment to an employee: notify them, and add it to their open exit checklist if any. */
-  private async afterNewEmployeeHolder(actor: Actor, asset: AssetRow, holder: ResolvedHolder, alloc: AllocationRow) {
+  private async afterNewEmployeeHolder(actor: Actor, asset: AssetRow, holder: ResolvedHolder, alloc: AllocationRow, consumed = false) {
     const employeeId = holder.columns.employeeId;
     if (!employeeId) return;
     const db = this.dbs.db;
     await this.notifications.notifyEmployee(employeeId, {
       type: 'ASSET_ASSIGNED',
-      title: `${asset.name} assigned to you`,
+      title: consumed ? `${asset.name} given to you` : `${asset.name} assigned to you`,
       body: `${asset.assetTag}${alloc.quantity > 1 ? ` · qty ${alloc.quantity}` : ''}`,
       link: `/assets/${asset.id}`,
     });
+    // Nothing to recover later for a one-time item.
+    if (consumed) return;
     const [openCase] = await db
       .select({ id: exitCases.id, caseNumber: exitCases.caseNumber })
       .from(exitCases)

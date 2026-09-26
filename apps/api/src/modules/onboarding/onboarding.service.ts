@@ -176,6 +176,7 @@ export class OnboardingService {
       .select({
         item: onboardingItems,
         typeIcon: assetTypes.icon,
+        consumable: assetTypes.consumable,
         assetTag: assets.assetTag,
         assetName: assets.name,
         assetStatus: assets.status,
@@ -191,6 +192,7 @@ export class OnboardingService {
     const list = items.map(({ item, ...a }) => ({
       ...item,
       typeIcon: a.typeIcon,
+      consumable: !!a.consumable,
       preparedAsset: item.preparedAssetId ? { id: item.preparedAssetId, assetTag: a.assetTag, name: a.assetName, status: a.assetStatus, holderName: a.assetHolderName, trackingMode: a.assetTrackingMode } : null,
       // The pick is only a note: warn when that asset has since gone to someone else.
       preparedUnavailable: item.status === 'PREPARED' && !!a.assetStatus && !READY_ASSET_STATUSES.includes(a.assetStatus),

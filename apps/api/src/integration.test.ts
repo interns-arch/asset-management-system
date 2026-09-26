@@ -325,6 +325,32 @@ describe('custody and lifecycle', () => {
     assert.equal((await call('POST', `/assets/${drone.body.id}/transfer`, { holderType: 'EMPLOYEE' })).status, 400);
   });
 
+  test('a joining kit is given for good: stock goes down, nothing to return or recover', async () => {
+    assert.equal((await call('POST', '/asset-types', { categoryId: ids.category, name: 'Bad kit', code: 'BKT', trackingMode: 'INDIVIDUAL', consumable: true })).status, 400);
+    const type = await call('POST', '/asset-types', { categoryId: ids.category, name: 'Joining Kit', code: 'TJK', trackingMode: 'QUANTITY', consumable: true });
+    assert.equal(type.status, 201);
+    const stock = await call('POST', '/assets', { assetTypeId: type.body.id, name: 'Joining Kit', status: 'AVAILABLE', quantity: 5, attributes: {} });
+    const joiner = await call('POST', '/employees', { employeeCode: 'T600', firstName: 'Kit', lastName: 'Getter' });
+
+    const given = await call('POST', `/assets/${stock.body.id}/assign`, { holderType: 'EMPLOYEE', holderId: joiner.body.id, quantity: 1 });
+    assert.equal(given.status, 200);
+    assert.equal(given.body.status, 'CONSUMED');
+    const after = await call('GET', `/assets/${stock.body.id}`);
+    assert.equal(after.body.availableQuantity, 4);
+    assert.equal(after.body.status, 'AVAILABLE');
+    assert.equal(after.body.activeAllocations.length, 0);
+
+    const person = await call('GET', `/employees/${joiner.body.id}`);
+    assert.equal(person.body.assets.length, 0, 'not something they hold');
+    assert.equal(person.body.given[0].name, 'Joining Kit');
+    assert.equal((await call('POST', `/assets/${stock.body.id}/return`, { condition: 'GOOD' })).status, 400, 'nothing to return');
+
+    // Leaving: the kit is not on the recovery checklist.
+    const notice = await call('POST', `/employees/${joiner.body.id}/status`, { status: 'NOTICE_PERIOD', lastWorkingDate: '2030-06-30' });
+    const exit = await call('GET', `/exit-cases/${notice.body.exitCaseId}`);
+    assert.equal(exit.body.items.length, 0);
+  });
+
   test('invalid lifecycle transitions are refused', async () => {
     const drone = await newDrone();
     const dispose = await call('POST', `/assets/${drone.body.id}/lifecycle`, { action: 'dispose' });

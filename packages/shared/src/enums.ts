@@ -53,7 +53,8 @@ export const HOLDER_TYPE_LABELS: Record<HolderType, string> = {
 export const TRACKING_MODES = ['INDIVIDUAL', 'QUANTITY'] as const;
 export type TrackingMode = (typeof TRACKING_MODES)[number];
 
-export const ALLOCATION_STATUSES = ['ACTIVE', 'RETURNED', 'TRANSFERRED', 'RELEASED', 'LOST'] as const;
+/** CONSUMED: a one-time item (joining kit, stationery) given for good — nothing to return. */
+export const ALLOCATION_STATUSES = ['ACTIVE', 'RETURNED', 'TRANSFERRED', 'RELEASED', 'LOST', 'CONSUMED'] as const;
 export type AllocationStatus = (typeof ALLOCATION_STATUSES)[number];
 
 /** JOINING: a new joiner being onboarded; becomes ACTIVE when they join. */

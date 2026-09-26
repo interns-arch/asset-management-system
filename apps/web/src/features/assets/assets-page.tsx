@@ -109,7 +109,7 @@ export default function AssetsPage() {
           <AssetStatusBadge status={a.status} />
           {a.trackingMode === 'QUANTITY' && (
             <span className="text-[11px] text-muted-foreground tabular">
-              {a.availableQuantity} of {a.quantity} free
+              {a.consumable ? `${a.availableQuantity} left` : `${a.availableQuantity} of ${a.quantity} free`}
             </span>
           )}
         </div>

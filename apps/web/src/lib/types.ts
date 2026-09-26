@@ -50,6 +50,7 @@ export interface AssetType {
   icon: string | null;
   description: string | null;
   trackingMode: TrackingMode;
+  consumable: boolean;
   categoryName: string;
   categoryIcon: string | null;
   categoryColor: string | null;
@@ -90,6 +91,8 @@ export interface AssetListItem {
   qrCode: string;
   name: string;
   status: AssetStatus;
+  /** One-time item (joining kit, stationery): given away, no return. */
+  consumable?: boolean;
   condition: Condition;
   trackingMode: TrackingMode;
   quantity: number;
@@ -211,7 +214,7 @@ export interface AssetDetail extends Omit<AssetListItem, 'categoryName' | 'categ
   ownerCompanyId: string | null;
   vendorId: string | null;
   category: { id: string; name: string; icon: string | null; color: string | null; code: string };
-  type: { id: string; name: string; icon: string | null; code: string; trackingMode: TrackingMode };
+  type: { id: string; name: string; icon: string | null; code: string; trackingMode: TrackingMode; consumable: boolean };
   ownerCompanyName: string | null;
   vendorName: string | null;
   fields: FieldDefinition[];
@@ -292,6 +295,7 @@ export interface EmployeeDetail extends Omit<Employee, 'assetCount' | 'openExitC
   assetsVerifiedByName: string | null;
   createdAt: string;
   assets: HeldAsset[];
+  given: HeldAsset[];
   login: { id: string; email: string | null; username: string | null; isActive: boolean; roleId: string; roleName: string; lastLoginAt: string | null } | null;
   openExitCase: { id: string; caseNumber: string; lastWorkingDate: string } | null;
   onboarding: { id: string; caseNumber: string; status: OnboardingStatus; joinDate: string } | null;
@@ -519,6 +523,7 @@ export interface OnboardingItem {
   issuedByName: string | null;
   skipReason: string | null;
   typeIcon: string | null;
+  consumable: boolean;
   preparedAsset: { id: string; assetTag: string | null; name: string | null; status: AssetStatus | null; holderName: string | null; trackingMode: TrackingMode | null } | null;
   preparedUnavailable: boolean;
 }

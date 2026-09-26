@@ -19,6 +19,7 @@ export interface SeedType {
   code: string;
   icon: string;
   trackingMode?: TrackingMode;
+  consumable?: boolean;
   description?: string;
   fields?: SeedField[];
 }
@@ -204,7 +205,8 @@ export const CATALOG: SeedCategory[] = [
           { label: 'Valid Until', type: 'date' },
         ],
       },
-      { name: 'Stationery', code: 'STN', icon: 'pencil-ruler', trackingMode: 'QUANTITY', description: 'Tracked by quantity', fields: [{ label: 'Unit', type: 'select', options: ['Piece', 'Pack', 'Box', 'Kit'] }] },
+      { name: 'Stationery', code: 'STN', icon: 'pencil-ruler', trackingMode: 'QUANTITY', consumable: true, description: 'Given away — no return', fields: [{ label: 'Unit', type: 'select', options: ['Piece', 'Pack', 'Box', 'Kit'] }] },
+      { name: 'Joining Kit', code: 'JKT', icon: 'gift', trackingMode: 'QUANTITY', consumable: true, description: 'Welcome kit for new joiners — given once, no return', fields: [{ label: 'Contents', type: 'text', placeholder: 'Bag, T-shirt, diary, pen, lanyard' }] },
     ],
   },
   {

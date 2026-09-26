@@ -180,6 +180,8 @@ export class EmployeesService {
       companyName: row.companyName,
       managerName: row.managerName,
       assets: heldAssets,
+      // One-time items (joining kit, stationery) they were given — nothing to return.
+      given: await this.assets(actor, id, 'CONSUMED'),
       login: login ?? null,
       onboarding: onboarding ?? null,
       openExitCase: exitCase,
@@ -189,7 +191,7 @@ export class EmployeesService {
   }
 
   /** Everything the employee currently holds (individual and pooled). */
-  async assets(actor: Actor, id: string) {
+  async assets(actor: Actor, id: string, status: 'ACTIVE' | 'CONSUMED' = 'ACTIVE') {
     if (!this.canSee(actor, id)) throw notFound('Employee');
     return this.dbs.db
       .select({
@@ -214,8 +216,8 @@ export class EmployeesService {
       .innerJoin(assets, eq(assets.id, allocations.assetId))
       .innerJoin(assetTypes, eq(assetTypes.id, assets.assetTypeId))
       .innerJoin(assetCategories, eq(assetCategories.id, assets.categoryId))
-      .where(and(eq(allocations.employeeId, id), eq(allocations.status, 'ACTIVE')))
-      .orderBy(asc(assetCategories.sortOrder), asc(assets.assetTag));
+      .where(and(eq(allocations.employeeId, id), eq(allocations.status, status)))
+      .orderBy(...(status === 'CONSUMED' ? [desc(allocations.assignedAt)] : [asc(assetCategories.sortOrder), asc(assets.assetTag)]));
   }
 
   async timeline(actor: Actor, id: string, q: Record<string, string>) {

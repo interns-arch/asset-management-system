@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { applyServerErrors, errorOf, Field, useZodForm } from '@/components/common/form';
 import { FormSheet } from '@/components/common/form-sheet';
 import { Input, NativeSelect, Textarea } from '@/components/ui/input';
+import { Switch } from '@/components/ui/primitives';
 import { api, errorMessage } from '@/lib/api';
 import { queryClient, useCategories } from '@/lib/queries';
 import type { AssetType } from '@/lib/types';
@@ -25,6 +26,7 @@ export default function AssetTypeForm({ open, onOpenChange, record, defaults }: 
     icon: t?.icon ?? 'box',
     description: t?.description ?? '',
     trackingMode: t?.trackingMode ?? 'INDIVIDUAL',
+    consumable: t?.consumable ?? false,
   });
   const e = (n: string) => errorOf(form, n);
   const categoryId = form.watch('categoryId') as string;
@@ -90,7 +92,10 @@ export default function AssetTypeForm({ open, onOpenChange, record, defaults }: 
                 key={o.v}
                 type="button"
                 disabled={editing && t.assetCount > 0}
-                onClick={() => form.setValue('trackingMode', o.v as 'INDIVIDUAL' | 'QUANTITY')}
+                onClick={() => {
+                  form.setValue('trackingMode', o.v as 'INDIVIDUAL' | 'QUANTITY');
+                  if (o.v === 'INDIVIDUAL') form.setValue('consumable', false);
+                }}
                 className={cn(
                   'flex cursor-pointer flex-col items-start gap-1 rounded-lg border p-3 text-left transition hover:border-primary/40 disabled:cursor-not-allowed disabled:opacity-60',
                   mode === o.v && 'border-primary bg-primary/5 ring-1 ring-primary/30',
@@ -103,6 +108,15 @@ export default function AssetTypeForm({ open, onOpenChange, record, defaults }: 
             ))}
           </div>
         </Field>
+        {mode === 'QUANTITY' && (
+          <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border p-3">
+            <span>
+              <span className="block text-sm font-medium">One-time item — no return</span>
+              <span className="text-xs text-muted-foreground">Given away for good (joining kit, stationery). Stock goes down; nothing to return or recover at exit.</span>
+            </span>
+            <Switch checked={!!form.watch('consumable')} onCheckedChange={(v) => form.setValue('consumable', v)} />
+          </label>
+        )}
         <Field label="Icon">
           <IconPicker value={form.watch('icon') as string} color={color} onChange={(v) => form.setValue('icon', v)} />
         </Field>

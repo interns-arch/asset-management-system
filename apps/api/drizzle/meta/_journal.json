@@ -78,6 +78,13 @@
       "when": 1790407099164,
       "tag": "0010_onboarding_approval",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790409369021,
+      "tag": "0011_joining_kit",
+      "breakpoints": true
     }
   ]
 }

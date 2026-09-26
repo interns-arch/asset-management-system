@@ -224,6 +224,8 @@ export const assetTypes = pgTable(
     icon: text('icon'),
     description: text('description'),
     trackingMode: text('tracking_mode', { enum: TRACKING_MODES }).notNull().default('INDIVIDUAL'),
+    /** Given away for good (joining kit, stationery): no custody, no return, not in exit checklists. */
+    consumable: boolean('consumable').notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

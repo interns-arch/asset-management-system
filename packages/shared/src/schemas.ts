@@ -135,6 +135,8 @@ export const assetTypeSchema = z.object({
   icon: optText(50),
   description: optText(500),
   trackingMode: z.enum(TRACKING_MODES).default('INDIVIDUAL'),
+  /** One-time items (joining kit, stationery): given away, never returned. Quantity tracking only. */
+  consumable: z.boolean().default(false),
 });
 export const fieldDefinitionSchema = z
   .object({
