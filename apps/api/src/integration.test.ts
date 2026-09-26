@@ -544,6 +544,9 @@ describe('leadership overview', () => {
     // Read-only: the CEO can look but not change.
     assert.equal((await call('POST', '/assets', { assetTypeId: ids.type, name: 'x', attributes: {} }, 'ceo')).status, 403);
     assert.equal((await call('GET', '/leadership', undefined, 'bob')).status, 403);
+    // CEO only: Admin and IT have full access to everything else, but not this page.
+    assert.equal((await call('GET', '/leadership', undefined, 'admin')).status, 403);
+    assert.equal((await call('GET', '/leadership', undefined, 'it')).status, 403);
   });
 });
 

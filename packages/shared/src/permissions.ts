@@ -27,6 +27,8 @@ export const PERMISSIONS = {
 
 export type Permission = keyof typeof PERMISSIONS;
 export const ALL_PERMISSIONS = Object.keys(PERMISSIONS) as Permission[];
+/** Admin / IT full access — everything except the CEO-only leadership overview. */
+export const ADMIN_PERMISSIONS = ALL_PERMISSIONS.filter((p) => p !== 'insights:leadership');
 
 export const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] = [
   {
@@ -49,8 +51,8 @@ export interface RoleTemplate {
 }
 
 export const SYSTEM_ROLES: RoleTemplate[] = [
-  { name: 'Admin', description: 'Full access to everything', permissions: ALL_PERMISSIONS },
-  { name: 'IT / Asset Manager', description: 'Full access: assets, people, logins and settings', permissions: ALL_PERMISSIONS },
+  { name: 'Admin', description: 'Full access to everything except the CEO’s leadership page', permissions: ADMIN_PERMISSIONS },
+  { name: 'IT / Asset Manager', description: 'Full access: assets, people, logins and settings', permissions: ADMIN_PERMISSIONS },
   {
     name: 'HR',
     description: 'Manages employees, notice periods and exits',

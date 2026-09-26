@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Injectable, Module, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { and, asc, eq, ilike, ne, or, sql } from 'drizzle-orm';
 import {
+  ADMIN_PERMISSIONS,
   ALL_PERMISSIONS,
   type Permission,
   roleSchema,
@@ -133,8 +134,8 @@ export class AdminService {
       const [before] = await db.select().from(roles).where(eq(roles.id, id)).for('update');
       if (!before) throw notFound('Role');
       const permissions = this.clean(input.permissions);
-      if (before.isSystem && before.name === 'Admin' && (permissions.length !== ALL_PERMISSIONS.length || input.name !== 'Admin')) {
-        throw badRequest('The Admin role always has every permission and cannot be renamed.');
+      if (before.isSystem && before.name === 'Admin' && (!ADMIN_PERMISSIONS.every((p) => permissions.includes(p)) || input.name !== 'Admin')) {
+        throw badRequest('The Admin role keeps full access and cannot be renamed.');
       }
       const changes = diffChanges(before, { ...input, permissions }, { name: 'Name', description: 'Description', permissions: 'Permissions' });
       if (!changes.length) return before;
