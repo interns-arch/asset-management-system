@@ -14,6 +14,7 @@ const DEMO = [
   { email: 'admin@cartrend.test', role: 'Admin' },
   { email: 'it@cartrend.test', role: 'IT / Asset manager' },
   { email: 'hr@cartrend.test', role: 'HR' },
+  { email: 'ceo@cartrend.test', role: 'Leadership (CEO)' },
   { email: 'manager@cartrend.test', role: 'Manager' },
   { email: 'rahul@cartrend.test', role: 'Employee (view only)' },
   { email: 'CT000099', role: 'Employee ID, no email' },

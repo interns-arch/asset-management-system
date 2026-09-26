@@ -192,7 +192,7 @@ export default function EmployeeDetailPage() {
                     <Pencil /> Edit details
                   </DropdownMenuItem>
                 )}
-                {can('employee:status') && (
+                {can('employee:status') && e.status !== 'JOINING' && (
                   <DropdownMenuItem onSelect={() => setStatusOpen(true)}>
                     <UserCog /> Change status / notice period
                   </DropdownMenuItem>
@@ -212,6 +212,18 @@ export default function EmployeeDetailPage() {
           </div>
         )}
       </Card>
+
+      {e.status === 'JOINING' && e.onboarding && (
+        <Link
+          to={`/onboarding/${e.onboarding.id}`}
+          className="flex items-center gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-900 transition hover:border-violet-300 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-200"
+        >
+          <UserPlus className="size-4 shrink-0" />
+          <span className="flex-1">
+            New joiner — joining <span className="font-semibold">{formatDate(e.onboarding.joinDate)}</span>. Onboarding {e.onboarding.caseNumber} →
+          </span>
+        </Link>
+      )}
 
       {e.openExitCase && (
         <Link

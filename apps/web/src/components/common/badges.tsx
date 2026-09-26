@@ -33,10 +33,10 @@ export function EmployeeStatusBadge({ status }: { status: EmployeeStatus }) {
 }
 
 /** Any enum value with a tone map. */
-export function EnumBadge<T extends string>({ value, tones, dot = true }: { value: T; tones: Record<T, BadgeTone>; dot?: boolean }) {
+export function EnumBadge<T extends string>({ value, tones, dot = true, labels }: { value: T; tones: Record<T, BadgeTone>; dot?: boolean; labels?: Record<T, string> }) {
   return (
     <Badge tone={tones[value]} dot={dot}>
-      {humanize(value)}
+      {labels?.[value] ?? humanize(value)}
     </Badge>
   );
 }

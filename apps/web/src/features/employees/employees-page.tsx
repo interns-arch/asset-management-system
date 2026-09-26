@@ -19,6 +19,7 @@ import { cn, daysUntil, formatDate, formatNumber } from '@/lib/utils';
 
 const TABS: { value: string; label: string }[] = [
   { value: '', label: 'Current' },
+  { value: 'JOINING', label: 'Joining' },
   { value: 'ACTIVE', label: 'Active' },
   { value: 'NOTICE_PERIOD', label: 'Notice period' },
   { value: 'ON_LEAVE', label: 'On leave' },

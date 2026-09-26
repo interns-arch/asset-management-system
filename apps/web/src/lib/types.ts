@@ -13,6 +13,8 @@ import type {
   MaintenanceType,
   OwnershipType,
   Permission,
+  OnboardingItemStatus,
+  OnboardingStatus,
   Priority,
   RequestStatus,
   TicketStatus,
@@ -160,7 +162,7 @@ export interface AllocationPhoto {
 }
 
 export interface QueueItem {
-  kind: 'TICKET' | 'REQUEST';
+  kind: 'TICKET' | 'REQUEST' | 'ONBOARDING';
   id: string;
   number: string;
   title: string;
@@ -292,6 +294,7 @@ export interface EmployeeDetail extends Omit<Employee, 'assetCount' | 'openExitC
   assets: HeldAsset[];
   login: { id: string; email: string | null; username: string | null; isActive: boolean; roleId: string; roleName: string; lastLoginAt: string | null } | null;
   openExitCase: { id: string; caseNumber: string; lastWorkingDate: string } | null;
+  onboarding: { id: string; caseNumber: string; status: OnboardingStatus; joinDate: string } | null;
   exitCases: { id: string; caseNumber: string; status: ExitCaseStatus; lastWorkingDate: string }[];
   directReports: { id: string; fullName: string; designation: string | null }[];
 }
@@ -481,4 +484,70 @@ export interface SearchResults {
   locations: { id: string; name: string; code: string | null; isStore: boolean }[];
   vendors: { id: string; name: string }[];
   assetTypes: { id: string; name: string; icon: string | null; categoryName: string }[];
+}
+
+export interface OnboardingListItem {
+  id: string;
+  caseNumber: string;
+  status: OnboardingStatus;
+  joinDate: string;
+  createdByName: string | null;
+  completedAt: string | null;
+  employeeId: string;
+  employeeName: string;
+  employeeCode: string;
+  designation: string | null;
+  departmentName: string | null;
+  itemsTotal: number;
+  itemsPlanned: number;
+  itemsPrepared: number;
+  itemsIssued: number;
+  itemsSkipped: number;
+}
+
+export interface OnboardingItem {
+  id: string;
+  assetTypeId: string | null;
+  itemName: string;
+  quantity: number;
+  notes: string | null;
+  status: OnboardingItemStatus;
+  preparedAssetId: string | null;
+  preparedByName: string | null;
+  allocationId: string | null;
+  issuedAt: string | null;
+  issuedByName: string | null;
+  skipReason: string | null;
+  typeIcon: string | null;
+  preparedAsset: { id: string; assetTag: string | null; name: string | null; status: AssetStatus | null; holderName: string | null; trackingMode: TrackingMode | null } | null;
+  preparedUnavailable: boolean;
+}
+
+export interface OnboardingDetail {
+  id: string;
+  caseNumber: string;
+  status: OnboardingStatus;
+  joinDate: string;
+  notes: string | null;
+  createdByName: string | null;
+  createdAt: string;
+  submittedAt: string | null;
+  submittedByName: string | null;
+  completedAt: string | null;
+  completedByName: string | null;
+  cancelledAt: string | null;
+  cancelReason: string | null;
+  employee: { id: string; employeeCode: string; fullName: string; designation: string | null; email: string | null; phone: string | null; status: EmployeeStatus; departmentName: string | null; locationName: string | null };
+  login: { id: string; isActive: boolean } | null;
+  items: OnboardingItem[];
+  counts: { total: number; planned: number; prepared: number; issued: number; skipped: number };
+  ready: boolean;
+}
+
+export interface OnboardingKit {
+  id: string;
+  name: string;
+  items: { assetTypeId: string | null; itemName: string | null; quantity: number; notes: string | null }[];
+  createdByName: string | null;
+  updatedAt: string;
 }

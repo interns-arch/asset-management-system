@@ -16,6 +16,7 @@ import {
   Shapes,
   ShieldCheck,
   Truck,
+  UserPlus,
   Users,
   UsersRound,
   Wrench,
@@ -37,6 +38,7 @@ export const MAIN_NAV: NavItem[] = [
   { label: 'Assets', to: '/assets', icon: Boxes, shortcut: 'G A' },
   { label: 'SIM cards', to: '/sims', icon: CardSim, perms: ['asset:view'] },
   { label: 'Employees', to: '/employees', icon: Users, perms: ['employee:view'], shortcut: 'G E' },
+  { label: 'Onboarding', to: '/onboarding', icon: UserPlus, perms: ['onboarding:manage', 'asset:assign'] },
   { label: 'Exits', to: '/exits', icon: LogOut, perms: ['exit:view'], shortcut: 'G X' },
   { label: 'Requests', to: '/requests', icon: ClipboardList, perms: ['request:create', 'request:approve', 'request:fulfil'], shortcut: 'G R' },
   { label: 'Tickets', to: '/tickets', icon: LifeBuoy, perms: ['ticket:create', 'ticket:manage'], shortcut: 'G T' },
@@ -64,6 +66,7 @@ export interface QuickAddItem {
 /** The universal "+ Add" menu, in the order from the brief. */
 export const QUICK_ADD: QuickAddItem[] = [
   { kind: 'employee', label: 'Employee', perms: ['employee:manage'] },
+  { kind: 'onboarding', label: 'New joiner', perms: ['onboarding:manage'] },
   { kind: 'asset', label: 'Asset', perms: ['asset:create'] },
   { kind: 'assetType', label: 'Asset type', perms: ['catalog:manage'] },
   { kind: 'category', label: 'Category', perms: ['catalog:manage'] },

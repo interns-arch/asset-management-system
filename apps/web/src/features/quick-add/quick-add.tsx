@@ -11,7 +11,8 @@ export type QuickAddKind =
   | 'company'
   | 'request'
   | 'ticket'
-  | 'maintenance';
+  | 'maintenance'
+  | 'onboarding';
 
 interface OpenState {
   kind: QuickAddKind;
@@ -35,6 +36,7 @@ const OrgForm = lazy(() => import('@/features/org/org-form'));
 const RequestForm = lazy(() => import('@/features/service/request-form'));
 const TicketForm = lazy(() => import('@/features/service/ticket-form'));
 const MaintenanceForm = lazy(() => import('@/features/service/maintenance-form'));
+const OnboardingForm = lazy(() => import('@/features/onboarding/onboarding-form'));
 
 /** One place that can open any "+ Add" form from anywhere (menu, palette, shortcuts, pages). */
 export function QuickAddProvider({ children }: { children: ReactNode }) {
@@ -68,6 +70,7 @@ export function QuickAddProvider({ children }: { children: ReactNode }) {
         {state?.kind === 'request' && <RequestForm key="request" {...props} />}
         {state?.kind === 'ticket' && <TicketForm key="ticket" {...props} />}
         {state?.kind === 'maintenance' && <MaintenanceForm key="maintenance" {...props} />}
+        {state?.kind === 'onboarding' && <OnboardingForm key="onboarding" {...props} />}
       </Suspense>
     </QuickAddContext.Provider>
   );

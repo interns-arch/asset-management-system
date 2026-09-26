@@ -435,7 +435,7 @@ export class ReconciliationService {
       });
     }
     for (const p of people) {
-      if (matched.has(p.id) || p.status === 'EXITED') continue;
+      if (matched.has(p.id) || p.status === 'EXITED' || p.status === 'JOINING') continue;
       items.push({ status: 'MISSING_IN_DUMP', key: p.code, title: p.fullName, subtitle: `${p.code} · in our employees but not in Salary Box`, entity: { kind: 'EMPLOYEE', id: p.id, label: `${p.fullName} (${p.code})` }, issues: [] });
     }
     return items;

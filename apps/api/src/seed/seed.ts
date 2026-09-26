@@ -202,6 +202,7 @@ async function main() {
   await login('hr@cartrend.test', 'Neha Kapoor', 'HR', neha);
   await login('manager@cartrend.test', 'Sanjay Rao', 'Manager', sanjay);
   await login('rahul@cartrend.test', 'Rahul Sharma', 'Employee', rahul);
+  await dbs.root.insert(users).values({ email: 'ceo@cartrend.test', name: 'Managing Director', passwordHash, roleId: roleIds.Leadership });
 
   const deptList = [depts.engineering, depts.engineering, depts.engineering, depts.sales, depts.sales, depts.finance, depts.operations, depts.hr, depts.it, depts.logistics];
   const designations: Record<string, string[]> = {
@@ -479,7 +480,7 @@ async function main() {
 
   const [{ assetCount }] = await dbs.root.select({ assetCount: sql<number>`count(*)::int` }).from(sql`assets`);
   console.log(`✔ Seeded demo data: ${assetCount} assets, ${staff.length + 6} employees, ${Object.keys(types).length} asset types.`);
-  console.log(`  Sign in with admin@cartrend.test / ${DEMO_PASSWORD} (also it@, hr@, manager@, rahul@cartrend.test, or employee ID CT000099)`);
+  console.log(`  Sign in with admin@cartrend.test / ${DEMO_PASSWORD} (also it@, hr@, manager@, ceo@, rahul@cartrend.test, or employee ID CT000099)`);
   await app.close();
 }
 

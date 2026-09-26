@@ -11,6 +11,7 @@ import { CatalogModule } from './modules/catalog/catalog.module';
 import { EmployeesModule } from './modules/employees/employees.module';
 import { ExitModule } from './modules/exit/exit.module';
 import { InsightsModule } from './modules/insights/insights.module';
+import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { OrgModule } from './modules/org/org.module';
 import { ReconciliationModule } from './modules/reconciliation/reconciliation.module';
 import { ServiceModule } from './modules/service/service.module';
@@ -53,6 +54,7 @@ export class ConfigController {
     InsightsModule,
     AdminModule,
     ReconciliationModule,
+    OnboardingModule,
   ],
   controllers: [HealthController, ConfigController],
 })

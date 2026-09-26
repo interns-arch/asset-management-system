@@ -1,6 +1,6 @@
 import type { Priority } from '@eam/shared';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, ArrowRight, CheckCircle2, ClipboardList, LifeBuoy, ListOrdered } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle2, ClipboardList, LifeBuoy, ListOrdered, UserPlus } from 'lucide-react';
 import { Link, useNavigate } from 'react-router';
 import { EnumBadge } from '@/components/common/badges';
 import { EmptyState, ErrorState, PageHeader } from '@/components/common/page';
@@ -21,11 +21,12 @@ const TILE: Record<Priority, string> = {
   MEDIUM: 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300',
   LOW: 'border-zinc-200 bg-zinc-50 text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800/40 dark:text-zinc-300',
 };
-const STATUS_TEXT: Record<string, string> = { OPEN: 'Open', IN_PROGRESS: 'In progress', PENDING: 'Needs approval', APPROVED: 'Ready to fulfil' };
+const STATUS_TEXT: Record<string, string> = { OPEN: 'Open', IN_PROGRESS: 'In progress', PENDING: 'Needs approval', APPROVED: 'Ready to fulfil', SUBMITTED: 'Prepare before joining' };
 const KINDS = [
   { value: '', label: 'Everything' },
   { value: 'TICKET', label: 'Tickets' },
   { value: 'REQUEST', label: 'Requests' },
+  { value: 'ONBOARDING', label: 'New joiners' },
 ];
 
 const useQueue = (params: Record<string, string> = {}) =>
@@ -132,7 +133,7 @@ function GroupedList({ items }: { items: QueueItem[] }) {
 
 function QueueRow({ item, compact }: { item: QueueItem; compact?: boolean }) {
   const navigate = useNavigate();
-  const Icon = item.kind === 'TICKET' ? LifeBuoy : ClipboardList;
+  const Icon = item.kind === 'TICKET' ? LifeBuoy : item.kind === 'ONBOARDING' ? UserPlus : ClipboardList;
   return (
     <button type="button" onClick={() => navigate(item.link)} className="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left transition hover:bg-muted/50">
       <span className={cn('w-1 self-stretch rounded-full', BAR[item.priority])} />
@@ -150,7 +151,7 @@ function QueueRow({ item, compact }: { item: QueueItem; compact?: boolean }) {
       <div className="flex shrink-0 flex-col items-end gap-1">
         <EnumBadge value={item.priority} tones={PRIORITY_TONE} dot={false} />
         <span className={cn('whitespace-nowrap text-[11px]', item.overdue ? 'font-semibold text-red-600' : 'text-muted-foreground')}>
-          {item.overdue ? `Overdue · needed ${formatDate(item.dueDate)}` : item.dueDate ? `Needed ${formatDate(item.dueDate)}` : relativeTime(item.createdAt)}
+          {item.overdue ? `Overdue · ${item.kind === 'ONBOARDING' ? 'joined' : 'needed'} ${formatDate(item.dueDate)}` : item.dueDate ? `${item.kind === 'ONBOARDING' ? 'Joins' : 'Needed'} ${formatDate(item.dueDate)}` : relativeTime(item.createdAt)}
         </span>
       </div>
     </button>

@@ -458,6 +458,72 @@ describe('logins of your choice', () => {
   });
 });
 
+describe('onboarding', () => {
+  test('HR plans a joiner, IT prepares and issues, joining day makes them active', async () => {
+    const kit = await call('POST', '/onboarding-kits', {
+      name: 'Drone pilot',
+      items: [
+        { assetTypeId: ids.type, quantity: 1, notes: '4K camera' },
+        { itemName: 'Safety vest', quantity: 1 },
+      ],
+    });
+    assert.equal(kit.status, 201);
+    const created = await call('POST', '/onboarding', { employeeCode: 'T500', firstName: 'Joiner', lastName: 'One', joinDate: '2030-01-15', kitId: kit.body.id, items: [{ itemName: 'Welcome kit' }] });
+    assert.equal(created.status, 201);
+    const caseId = created.body.id;
+    const employeeId = created.body.employeeId;
+
+    let emp = await call('GET', `/employees/${employeeId}`);
+    assert.equal(emp.body.status, 'JOINING');
+    assert.equal(emp.body.onboarding.id, caseId);
+    assert.equal((await call('POST', `/employees/${employeeId}/status`, { status: 'NOTICE_PERIOD', lastWorkingDate: '2030-02-01' })).status, 400);
+    assert.equal((await call('GET', '/onboarding', undefined, 'bob')).status, 403);
+
+    let ob = await call('GET', `/onboarding/${caseId}`, undefined, 'it');
+    assert.equal(ob.body.status, 'DRAFT');
+    assert.deepEqual(ob.body.items.map((i: { itemName: string }) => i.itemName), ['Quadcopter', 'Safety vest', 'Welcome kit']);
+
+    // Sending to IT notifies them and puts the joiner in their priority queue.
+    assert.equal((await call('POST', `/onboarding/${caseId}/submit`)).status, 200);
+    const notes = await call('GET', '/notifications', undefined, 'it');
+    assert.ok(JSON.stringify(notes.body).includes('New joiner: Joiner One'));
+    const queue = await call('GET', '/queue?kind=ONBOARDING', undefined, 'it');
+    assert.ok(queue.body.items.some((i: { id: string }) => i.id === caseId));
+
+    // IT sets a drone aside (a note, not a reservation), skips the vest, and issues what is prepared.
+    const drone = await newDrone({ name: 'Joiner drone' });
+    const [droneItem, vest] = ob.body.items;
+    const taken = await newDrone({ name: 'Already out' });
+    await call('POST', `/assets/${taken.body.id}/assign`, { holderType: 'EMPLOYEE', holderId: ids.alice });
+    assert.equal((await call('PATCH', `/onboarding/${caseId}/items/${droneItem.id}`, { status: 'PREPARED', preparedAssetId: taken.body.id }, 'it')).status, 400, 'an asset someone holds cannot be set aside');
+    assert.equal((await call('PATCH', `/onboarding/${caseId}/items/${droneItem.id}`, { status: 'PREPARED', preparedAssetId: drone.body.id }, 'it')).status, 200);
+    assert.equal((await call('PATCH', `/onboarding/${caseId}/items/${vest.id}`, { status: 'SKIPPED', skipReason: 'Not needed for office role' }, 'it')).status, 200);
+    ob = await call('GET', `/onboarding/${caseId}`, undefined, 'it');
+    assert.equal(ob.body.ready, false, 'the welcome kit is still to prepare');
+    const issued = await call('POST', `/onboarding/${caseId}/issue-prepared`, {}, 'it');
+    assert.equal(issued.body.issued, 1);
+    emp = await call('GET', `/employees/${employeeId}`);
+    assert.ok(emp.body.assets.some((a: { assetId: string }) => a.assetId === drone.body.id));
+
+    // Joining day: employee becomes active, the un-given welcome kit becomes an approved request.
+    const done = await call('POST', `/onboarding/${caseId}/complete`, {}, 'it');
+    assert.equal(done.status, 200);
+    assert.equal(done.body.requests.length, 1);
+    emp = await call('GET', `/employees/${employeeId}`);
+    assert.equal(emp.body.status, 'ACTIVE');
+    const reqs = await call('GET', `/requests?search=${done.body.requests[0]}&status=APPROVED`, undefined, 'it');
+    assert.equal(reqs.body.items[0].typeName, 'Welcome kit');
+    assert.equal((await call('POST', `/onboarding/${caseId}/cancel`, { reason: 'too late' })).status, 409);
+  });
+
+  test('a joiner who does not join is closed and marked exited', async () => {
+    const created = await call('POST', '/onboarding', { employeeCode: 'T501', firstName: 'No', lastName: 'Show', joinDate: '2030-03-01', items: [{ itemName: 'Laptop' }] });
+    assert.equal((await call('POST', `/onboarding/${created.body.id}/cancel`, { reason: 'Declined the offer' })).status, 200);
+    const emp = await call('GET', `/employees/${created.body.employeeId}`);
+    assert.equal(emp.body.status, 'EXITED');
+  });
+});
+
 describe('leadership overview', () => {
   test('the Leadership role sees the overview; employees cannot', async () => {
     const roleList = await call('GET', '/roles');

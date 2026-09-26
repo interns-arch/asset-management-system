@@ -6,19 +6,7 @@ import { type Actor, assertCan, can } from '../../common/actor';
 import { normaliseCode, qrToken } from '../../common/codes';
 import { badRequest, likePattern, listFilter, listParams, notFound, today, uuidParam } from '../../common/http';
 import { DbService } from '../../db/db.service';
-import {
-  allocations,
-  assetCategories,
-  assets,
-  assetTypes,
-  companies,
-  departments,
-  employees,
-  exitCases,
-  locations,
-  roles,
-  users,
-} from '../../db/schema';
+import { allocations, assetCategories, assets, assetTypes, companies, departments, employees, exitCases, locations, onboardingCases, roles, users } from '../../db/schema';
 import { diffChanges, HistoryService } from '../../core/history.service';
 import { AuthService, hashPassword } from '../auth/auth.service';
 import { ExitService } from '../exit/exit.service';
@@ -174,6 +162,12 @@ export class EmployeesService {
         .where(and(eq(employees.managerId, id), sql`${employees.status} <> 'EXITED'`))
         .orderBy(asc(employees.fullName)),
     ]);
+    const [onboarding] = await db
+      .select({ id: onboardingCases.id, caseNumber: onboardingCases.caseNumber, status: onboardingCases.status, joinDate: onboardingCases.joinDate })
+      .from(onboardingCases)
+      .where(eq(onboardingCases.employeeId, id))
+      .orderBy(desc(onboardingCases.createdAt))
+      .limit(1);
     const pastExits = await db
       .select({ id: exitCases.id, caseNumber: exitCases.caseNumber, status: exitCases.status, lastWorkingDate: exitCases.lastWorkingDate })
       .from(exitCases)
@@ -187,6 +181,7 @@ export class EmployeesService {
       managerName: row.managerName,
       assets: heldAssets,
       login: login ?? null,
+      onboarding: onboarding ?? null,
       openExitCase: exitCase,
       exitCases: pastExits,
       directReports: reports,
@@ -371,6 +366,7 @@ export class EmployeesService {
     return this.dbs.tx(async (db) => {
       const [emp] = await db.select().from(employees).where(eq(employees.id, id)).for('update');
       if (!emp) throw notFound('Employee');
+      if (emp.status === 'JOINING') throw badRequest(`${emp.fullName} is still being onboarded — mark them as joined (or cancel) from Onboarding.`);
       const openCase = await this.exits.openCaseFor(id);
 
       switch (input.status) {

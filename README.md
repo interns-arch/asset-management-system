@@ -98,11 +98,17 @@ only sees their own assets and QR. The IT role has full access.
   saved as a report (matched, mismatched, not in system, not in file) and notified to the team.
   The file is read in the browser and only the needed columns are sent; Aadhaar, PAN, bank details
   and addresses never leave the computer, and card numbers are masked.
+- **Onboarding** — HR adds a new joiner (status *Joining*) with the assets they should get, or
+  starts from a saved kit; *Send to IT* notifies IT and puts them in the priority queue by joining
+  date. IT sets assets aside and hands them over (with photos); *Mark joined* makes them Active and
+  turns anything not yet given into approved requests.
+- **Leadership overview** — for the new *Leadership* role (CEO): headcount, joiners/leavers,
+  assets, IT service health and what each IT team member handled, by 7/30/90 days or a year.
 - **Priority queue** — one worklist (`G Q`) of open tickets and requests to approve or fulfil,
   ordered Urgent → High → Medium → Low, then overdue, then oldest; also on the dashboard.
 - **Logins** — IT chooses the login ID, email and password (or generates a password) from the
   person's page or Settings → Users. People sign in with the login ID, employee ID or email
-  (any letter case).
+  (any letter case). The role and login can also be set while adding the employee.
 - **Roles & permissions** — Admin and IT / Asset Manager (full access), HR, Manager, and
   Employee (view only: their own assets and QR, plus requests and tickets). All editable.
 

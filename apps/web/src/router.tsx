@@ -23,6 +23,8 @@ const TicketsPage = lazy(() => import('@/features/service/tickets-page'));
 const QueuePage = lazy(() => import('@/features/queue/queue-page'));
 const SimsPage = lazy(() => import('@/features/assets/sims-page'));
 const LeadershipPage = lazy(() => import('@/features/leadership/leadership-page'));
+const OnboardingPage = lazy(() => import('@/features/onboarding/onboarding-page'));
+const OnboardingDetailPage = lazy(() => import('@/features/onboarding/onboarding-detail-page'));
 const ReconciliationPage = lazy(() => import('@/features/reconciliation/reconciliation-page'));
 const ReconRunPage = lazy(() => import('@/features/reconciliation/run-page'));
 const MaintenancePage = lazy(() => import('@/features/service/maintenance-page'));
@@ -107,6 +109,8 @@ export const router = createBrowserRouter([
           { path: 'queue', element: <QueuePage /> },
           { path: 'sims', element: <SimsPage /> },
           { path: 'leadership', element: <LeadershipPage /> },
+          { path: 'onboarding', element: <OnboardingPage /> },
+          { path: 'onboarding/:id', element: <OnboardingDetailPage /> },
           { path: 'reconciliation', element: <ReconciliationPage /> },
           { path: 'reconciliation/:id', element: <ReconRunPage /> },
           { path: 'maintenance', element: <MaintenancePage /> },
