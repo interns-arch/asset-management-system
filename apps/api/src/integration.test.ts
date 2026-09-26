@@ -458,6 +458,29 @@ describe('logins of your choice', () => {
   });
 });
 
+describe('leadership overview', () => {
+  test('the Leadership role sees the overview; employees cannot', async () => {
+    const roleList = await call('GET', '/roles');
+    const leadership = roleList.body.find((x: { name: string }) => x.name === 'Leadership');
+    assert.ok(leadership, 'Leadership role exists');
+    await call('POST', '/users', { name: 'The CEO', username: 'ceo', password: PASSWORD, roleId: leadership.id });
+    await login('ceo', 'ceo');
+
+    const r = await call('GET', '/leadership?days=90', undefined, 'ceo');
+    assert.equal(r.status, 200);
+    assert.equal(r.body.days, 90);
+    assert.ok(r.body.headline.headcount >= 2);
+    assert.ok(r.body.service.handovers >= 1);
+    const it = r.body.team.find((m: { name: string }) => m.name === 'Test IT');
+    assert.ok(it, 'IT user is listed in the team');
+    assert.ok(!r.body.team.some((m: { name: string }) => m.name === 'The CEO'), 'view-only roles are not in the team');
+
+    // Read-only: the CEO can look but not change.
+    assert.equal((await call('POST', '/assets', { assetTypeId: ids.type, name: 'x', attributes: {} }, 'ceo')).status, 403);
+    assert.equal((await call('GET', '/leadership', undefined, 'bob')).status, 403);
+  });
+});
+
 describe('reconciliation', () => {
   test('an Airtel dump is matched to SIM records by connection or SIM number', async () => {
     const cat = await call('POST', '/categories', { name: 'Telecom', code: 'TEL' });

@@ -29,6 +29,8 @@ import {
   LOCATION_TYPES,
   MAINTENANCE_STATUSES,
   MAINTENANCE_TYPES,
+  ONBOARDING_ITEM_STATUSES,
+  ONBOARDING_STATUSES,
   OWNERSHIP_TYPES,
   PRIORITIES,
   RECON_SOURCES,
@@ -624,3 +626,68 @@ export const reconciliationRuns = pgTable(
   },
   (t) => [index('reconciliation_runs_created_idx').on(t.source, t.createdAt)],
 );
+
+// ─── Onboarding (new joiners) ──────────────────────────────────────────────
+
+export const onboardingCases = pgTable(
+  'onboarding_cases',
+  {
+    id: pk(),
+    caseNumber: text('case_number').notNull().unique(),
+    employeeId: uuid('employee_id')
+      .notNull()
+      .references(() => employees.id),
+    status: text('status', { enum: ONBOARDING_STATUSES }).notNull().default('DRAFT'),
+    joinDate: date('join_date', { mode: 'string' }).notNull(),
+    notes: text('notes'),
+    createdBy: uuid('created_by'),
+    createdByName: text('created_by_name'),
+    submittedAt: timestamp('submitted_at', { withTimezone: true }),
+    submittedByName: text('submitted_by_name'),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    completedByName: text('completed_by_name'),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    cancelReason: text('cancel_reason'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('onboarding_one_open_uq').on(t.employeeId).where(sql`status in ('DRAFT', 'SUBMITTED')`),
+    index('onboarding_status_idx').on(t.status, t.joinDate),
+  ],
+);
+
+export const onboardingItems = pgTable(
+  'onboarding_items',
+  {
+    id: pk(),
+    caseId: uuid('case_id')
+      .notNull()
+      .references(() => onboardingCases.id, { onDelete: 'cascade' }),
+    assetTypeId: uuid('asset_type_id').references(() => assetTypes.id, { onDelete: 'set null' }),
+    itemName: text('item_name').notNull(),
+    quantity: integer('quantity').notNull().default(1),
+    notes: text('notes'),
+    status: text('status', { enum: ONBOARDING_ITEM_STATUSES }).notNull().default('PLANNED'),
+    // Only a note of which asset IT means to give — it is not reserved.
+    preparedAssetId: uuid('prepared_asset_id').references(() => assets.id, { onDelete: 'set null' }),
+    preparedByName: text('prepared_by_name'),
+    allocationId: uuid('allocation_id').references(() => allocations.id, { onDelete: 'set null' }),
+    issuedAt: timestamp('issued_at', { withTimezone: true }),
+    issuedByName: text('issued_by_name'),
+    skipReason: text('skip_reason'),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [index('onboarding_items_case_idx').on(t.caseId, t.sortOrder)],
+);
+
+/** Saved lists of what a role usually gets (e.g. "Field Sales Executive"). */
+export const onboardingKits = pgTable('onboarding_kits', {
+  id: pk(),
+  name: text('name').notNull().unique(),
+  items: jsonb('items').$type<{ assetTypeId: string | null; itemName: string | null; quantity: number; notes: string | null }[]>().notNull(),
+  createdByName: text('created_by_name'),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});

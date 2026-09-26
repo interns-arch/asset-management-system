@@ -53,10 +53,12 @@ export type TrackingMode = (typeof TRACKING_MODES)[number];
 export const ALLOCATION_STATUSES = ['ACTIVE', 'RETURNED', 'TRANSFERRED', 'RELEASED', 'LOST'] as const;
 export type AllocationStatus = (typeof ALLOCATION_STATUSES)[number];
 
-export const EMPLOYEE_STATUSES = ['ACTIVE', 'ON_LEAVE', 'NOTICE_PERIOD', 'EXITED'] as const;
+/** JOINING: a new joiner being onboarded; becomes ACTIVE when they join. */
+export const EMPLOYEE_STATUSES = ['JOINING', 'ACTIVE', 'ON_LEAVE', 'NOTICE_PERIOD', 'EXITED'] as const;
 export type EmployeeStatus = (typeof EMPLOYEE_STATUSES)[number];
 
 export const EMPLOYEE_STATUS_LABELS: Record<EmployeeStatus, string> = {
+  JOINING: 'Joining',
   ACTIVE: 'Active',
   ON_LEAVE: 'On Leave',
   NOTICE_PERIOD: 'Notice Period',
@@ -68,6 +70,13 @@ export type ExitCaseStatus = (typeof EXIT_CASE_STATUSES)[number];
 
 export const EXIT_ITEM_STATUSES = ['PENDING', 'RETURNED', 'DAMAGED', 'MISSING'] as const;
 export type ExitItemStatus = (typeof EXIT_ITEM_STATUSES)[number];
+
+export const ONBOARDING_STATUSES = ['DRAFT', 'SUBMITTED', 'COMPLETED', 'CANCELLED'] as const;
+export type OnboardingStatus = (typeof ONBOARDING_STATUSES)[number];
+export const ONBOARDING_STATUS_LABELS: Record<OnboardingStatus, string> = { DRAFT: 'Planning (HR)', SUBMITTED: 'With IT', COMPLETED: 'Joined', CANCELLED: 'Cancelled' };
+
+export const ONBOARDING_ITEM_STATUSES = ['PLANNED', 'PREPARED', 'ISSUED', 'SKIPPED'] as const;
+export type OnboardingItemStatus = (typeof ONBOARDING_ITEM_STATUSES)[number];
 
 /** Exit items in these statuses count as cleared. */
 export const EXIT_ITEM_CLEARED: readonly ExitItemStatus[] = ['RETURNED', 'DAMAGED'];
@@ -97,6 +106,7 @@ export const HISTORY_ENTITY_TYPES = [
   'ASSET',
   'EMPLOYEE',
   'EXIT_CASE',
+  'ONBOARDING_CASE',
   'CATEGORY',
   'ASSET_TYPE',
   'FIELD',

@@ -2,6 +2,8 @@ import type {
   AssetStatus,
   Condition,
   EmployeeStatus,
+  OnboardingItemStatus,
+  OnboardingStatus,
   ExitCaseStatus,
   ExitItemStatus,
   MaintenanceStatus,
@@ -33,11 +35,15 @@ export const CONDITION_TONE: Record<Condition, BadgeTone> = {
 };
 
 export const EMPLOYEE_STATUS_TONE: Record<EmployeeStatus, BadgeTone> = {
+  JOINING: 'violet',
   ACTIVE: 'green',
   ON_LEAVE: 'cyan',
   NOTICE_PERIOD: 'amber',
   EXITED: 'neutral',
 };
+
+export const ONBOARDING_TONE: Record<OnboardingStatus, BadgeTone> = { DRAFT: 'gray', SUBMITTED: 'blue', COMPLETED: 'green', CANCELLED: 'neutral' };
+export const ONBOARDING_ITEM_TONE: Record<OnboardingItemStatus, BadgeTone> = { PLANNED: 'gray', PREPARED: 'blue', ISSUED: 'green', SKIPPED: 'neutral' };
 
 export const EXIT_CASE_TONE: Record<ExitCaseStatus, BadgeTone> = { OPEN: 'amber', COMPLETED: 'green', CANCELLED: 'neutral' };
 

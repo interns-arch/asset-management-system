@@ -110,7 +110,7 @@ export const employeeSchema = z.object({
 });
 export const employeeStatusSchema = z
   .object({
-    status: z.enum(EMPLOYEE_STATUSES),
+    status: z.enum(EMPLOYEE_STATUSES).refine((s) => s !== 'JOINING', 'New joiners are added through Onboarding'),
     lastWorkingDate: optDate,
     noticeDate: optDate,
     reason: optText(1000),
@@ -393,4 +393,46 @@ export type UserCreateInput = z.infer<typeof userCreateSchema>;
 export type UserUpdateInput = z.infer<typeof userUpdateSchema>;
 export type EmployeeAccessInput = z.infer<typeof employeeAccessSchema>;
 export type EmployeeCreateInput = z.infer<typeof employeeCreateSchema>;
+
+// ─── Onboarding ─────────────────────────────────────────────────────────────
+/** A suggested item: a catalog type or anything typed in. */
+export const onboardingItemSchema = z
+  .object({
+    assetTypeId: optId,
+    itemName: optText(200),
+    quantity: z.coerce.number().int().min(1).max(1000).default(1),
+    notes: optText(500),
+  })
+  .refine((v) => !!v.assetTypeId || !!v.itemName, { message: 'Pick an asset type or type what they need', path: ['assetTypeId'] });
+
+export const onboardingCreateSchema = employeeSchema
+  .omit({ joinDate: true })
+  .extend({
+    joinDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Pick the joining date'),
+    items: z.array(onboardingItemSchema).max(50).default([]),
+    kitId: optId,
+  });
+
+export const onboardingItemUpdateSchema = z.object({
+  quantity: z.coerce.number().int().min(1).max(1000).optional(),
+  notes: optText(500),
+  status: z.enum(['PLANNED', 'PREPARED', 'SKIPPED']).optional(),
+  preparedAssetId: optId,
+  skipReason: optText(500),
+});
+
+export const onboardingUpdateSchema = z.object({ joinDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), notes: optText(2000) });
+export const onboardingIssueSchema = z.object({ assetId: optId, notes: optText(500) });
+export const onboardingCancelSchema = z.object({ reason: z.string().trim().min(3, 'Give a short reason').max(500) });
+export const onboardingKitSchema = z.object({
+  name: reqText(120),
+  items: z.array(onboardingItemSchema).min(1, 'Add at least one item').max(50),
+});
+
+export type OnboardingItemInput = z.infer<typeof onboardingItemSchema>;
+export type OnboardingCreateInput = z.infer<typeof onboardingCreateSchema>;
+export type OnboardingItemUpdateInput = z.infer<typeof onboardingItemUpdateSchema>;
+export type OnboardingUpdateInput = z.infer<typeof onboardingUpdateSchema>;
+export type OnboardingIssueInput = z.infer<typeof onboardingIssueSchema>;
+export type OnboardingKitInput = z.infer<typeof onboardingKitSchema>;
 export type RoleInput = z.infer<typeof roleSchema>;

@@ -21,6 +21,8 @@ export const PERMISSIONS = {
   'maintenance:manage': 'Manage maintenance',
   'history:view': 'View the organisation-wide activity log',
   'user:manage': 'Manage users and roles',
+  'onboarding:manage': 'Plan onboarding for new joiners (HR)',
+  'insights:leadership': 'View the leadership overview (CEO)',
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;
@@ -31,13 +33,13 @@ export const PERMISSION_GROUPS: { label: string; permissions: Permission[] }[] =
     label: 'Assets',
     permissions: ['asset:view', 'asset:create', 'asset:edit', 'asset:assign', 'asset:lifecycle', 'catalog:manage'],
   },
-  { label: 'People & organisation', permissions: ['employee:view', 'employee:manage', 'employee:status', 'org:manage'] },
+  { label: 'People & organisation', permissions: ['employee:view', 'employee:manage', 'employee:status', 'onboarding:manage', 'org:manage'] },
   { label: 'Employee exit', permissions: ['exit:view', 'exit:manage', 'exit:override'] },
   {
     label: 'Service',
     permissions: ['request:create', 'request:approve', 'request:fulfil', 'ticket:create', 'ticket:manage', 'maintenance:manage'],
   },
-  { label: 'Administration', permissions: ['dashboard:view', 'history:view', 'user:manage'] },
+  { label: 'Administration', permissions: ['dashboard:view', 'insights:leadership', 'history:view', 'user:manage'] },
 ];
 
 export interface RoleTemplate {
@@ -58,11 +60,17 @@ export const SYSTEM_ROLES: RoleTemplate[] = [
       'employee:view',
       'employee:manage',
       'employee:status',
+      'onboarding:manage',
       'exit:view',
       'exit:override',
       'request:create',
       'ticket:create',
     ],
+  },
+  {
+    name: 'Leadership',
+    description: 'CEO / directors: leadership overview and a read-only view of everything',
+    permissions: ['insights:leadership', 'dashboard:view', 'asset:view', 'employee:view', 'exit:view', 'history:view', 'request:create', 'ticket:create'],
   },
   {
     name: 'Manager',

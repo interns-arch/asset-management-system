@@ -1,7 +1,7 @@
 import { Controller, Get, Injectable, Module, Query } from '@nestjs/common';
 import { and, asc, desc, eq, ilike, or, sql } from 'drizzle-orm';
 import { type Actor, can } from '../../common/actor';
-import { CurrentActor, likePattern, today } from '../../common/http';
+import { CurrentActor, likePattern, RequirePermissions, today } from '../../common/http';
 import { DbService } from '../../db/db.service';
 import {
   assetCategories,
@@ -21,6 +21,7 @@ import { normaliseCode } from '../../common/codes';
 import { AssetsService } from '../assets/assets.service';
 import { EmployeesModule } from '../employees/employees.module';
 import { EmployeesService } from '../employees/employees.service';
+import { LeadershipService } from './leadership.service';
 
 @Injectable()
 export class SearchService {
@@ -137,7 +138,7 @@ export class DashboardService {
         exit_pending_items: number;
         total_value: number;
       }>(sql`select
-          (select count(*)::int from employees where status <> 'EXITED') as employees,
+          (select count(*)::int from employees where status not in ('EXITED', 'JOINING')) as employees,
           (select count(*)::int from employees where status = 'NOTICE_PERIOD') as on_notice,
           (select count(*)::int from asset_requests where status = 'PENDING') as pending_requests,
           (select count(*)::int from asset_requests where status = 'APPROVED') as approved_requests,
@@ -250,6 +251,7 @@ export class InsightsController {
   constructor(
     private readonly searchService: SearchService,
     private readonly dashboard: DashboardService,
+    private readonly leadership: LeadershipService,
   ) {}
 
   @Get('search')
@@ -261,11 +263,17 @@ export class InsightsController {
   summary(@CurrentActor() actor: Actor) {
     return this.dashboard.summary(actor);
   }
+
+  @Get('leadership')
+  @RequirePermissions('insights:leadership')
+  overview(@Query('days') days?: string) {
+    return this.leadership.overview(days);
+  }
 }
 
 @Module({
   imports: [AssetsModule, EmployeesModule],
-  providers: [SearchService, DashboardService],
+  providers: [SearchService, DashboardService, LeadershipService],
   controllers: [InsightsController],
 })
 export class InsightsModule {}
