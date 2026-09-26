@@ -12,7 +12,7 @@ import { Avatar, Card } from '@/components/ui/primitives';
 import { useQuickAdd } from '@/features/quick-add/quick-add';
 import { api, type Page } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { useDepartments, useLocations } from '@/lib/queries';
+import { useDepartments } from '@/lib/queries';
 import type { Employee } from '@/lib/types';
 import { useSearchBox, useUrlFilters } from '@/lib/url-state';
 import { cn, daysUntil, formatDate, formatNumber } from '@/lib/utils';
@@ -33,7 +33,6 @@ export default function EmployeesPage() {
   const { values: f, set, clear } = useUrlFilters({ page: '1', pageSize: '25', sort: 'name', dir: 'asc' });
   const [search, setSearch] = useSearchBox(f.search ?? '', (v) => set({ search: v }));
   const departments = useDepartments();
-  const locations = useLocations();
   const q = useQuery({ queryKey: ['employees', f], queryFn: () => api.get<Page<Employee>>('/employees', f) });
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -95,7 +94,6 @@ export default function EmployeesPage() {
     },
     { key: 'designation', header: 'Designation', hideOnMobile: true, cell: (e) => <span className="text-muted-foreground">{e.designation ?? '—'}</span> },
     { key: 'department', header: 'Department', hideOnMobile: true, cell: (e) => e.departmentName ?? <span className="text-muted-foreground">—</span> },
-    { key: 'location', header: 'Location', hideOnMobile: true, cell: (e) => <span className="text-muted-foreground">{e.locationName ?? '—'}</span> },
     {
       key: 'status',
       header: 'Status',
@@ -195,14 +193,6 @@ export default function EmployeesPage() {
               </option>
             ))}
           </NativeSelect>
-          <NativeSelect className="w-auto min-w-40" value={f.locationId ?? ''} onChange={(e) => set({ locationId: e.target.value })}>
-            <option value="">All locations</option>
-            {(locations.data ?? []).map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.name}
-              </option>
-            ))}
-          </NativeSelect>
           <label className="flex items-center gap-2 text-[13px] text-muted-foreground">
             <input type="checkbox" className="accent-[var(--primary)]" checked={f.hasAssets === '1'} onChange={(e) => set({ hasAssets: e.target.checked ? '1' : null })} />
             Holding assets
@@ -239,7 +229,7 @@ export default function EmployeesPage() {
               icon={Users}
               title="No employees found"
               action={
-                f.search || f.departmentId || f.locationId ? (
+                f.search || f.departmentId ? (
                   <Button variant="outline" size="sm" onClick={() => clear(['status'])}>
                     Clear filters
                   </Button>

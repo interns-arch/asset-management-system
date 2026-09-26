@@ -176,10 +176,16 @@ export const fieldUpdateSchema = z.object({
 export const reorderSchema = z.object({ ids: z.array(z.string().uuid()).min(1).max(500) });
 
 // ─── Assets ─────────────────────────────────────────────────────────────────
-export const holderRefSchema = z.object({
-  holderType: z.enum(HOLDER_TYPES),
-  holderId: reqId,
-});
+const needsHolder = (v: { holderType: string; holderId?: string | null }) => v.holderType === 'INVENTORY' || !!v.holderId;
+const holderMessage = { message: 'Choose who receives it', path: ['holderId'] };
+
+/** One branch: "In store" needs no location — the company store is used. */
+export const holderRefSchema = z
+  .object({
+    holderType: z.enum(HOLDER_TYPES),
+    holderId: optId,
+  })
+  .refine(needsHolder, holderMessage);
 
 const assetCore = {
   name: reqText(200),
@@ -217,14 +223,15 @@ export const assetUpdateSchema = z.object({
   version: z.number().int(),
 });
 
-export const assignSchema = z.object({
+const assignFields = z.object({
   holderType: z.enum(HOLDER_TYPES),
-  holderId: reqId,
+  holderId: optId,
   quantity: z.coerce.number().int().min(1).default(1),
   expectedReturnDate: optDate,
   notes: optText(1000),
 });
-export const transferSchema = assignSchema.extend({ allocationId: optId });
+export const assignSchema = assignFields.refine(needsHolder, holderMessage);
+export const transferSchema = assignFields.extend({ allocationId: optId }).refine(needsHolder, holderMessage);
 export const returnSchema = z.object({
   allocationId: optId,
   condition: z.enum(CONDITIONS).default('GOOD'),

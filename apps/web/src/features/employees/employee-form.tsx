@@ -116,9 +116,6 @@ export default function EmployeeForm({ open, onOpenChange, record, defaults }: F
           <Field label="Department" error={e('departmentId')}>
             <EntityPicker kind="DEPARTMENT" {...pick('departmentId')} />
           </Field>
-          <Field label="Location" error={e('locationId')}>
-            <EntityPicker kind="LOCATION" {...pick('locationId')} />
-          </Field>
           <Field label="Reports to" error={e('managerId')}>
             <EntityPicker kind="EMPLOYEE" selectedLabel={emp?.managerName} {...pick('managerId')} />
           </Field>

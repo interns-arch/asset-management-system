@@ -314,6 +314,17 @@ describe('custody and lifecycle', () => {
     assert.ok(denied.status === 403 || denied.status === 404);
   });
 
+  test('one branch: "in store" needs no location', async () => {
+    const drone = await newDrone({ name: 'Store drone' });
+    const r = await call('POST', `/assets/${drone.body.id}/assign`, { holderType: 'INVENTORY' });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    const detail = await call('GET', `/assets/${drone.body.id}`);
+    assert.equal(detail.body.status, 'IN_INVENTORY');
+    assert.equal(detail.body.holderName, 'Test Store');
+    // Anyone else still needs a person / department / vendor.
+    assert.equal((await call('POST', `/assets/${drone.body.id}/transfer`, { holderType: 'EMPLOYEE' })).status, 400);
+  });
+
   test('invalid lifecycle transitions are refused', async () => {
     const drone = await newDrone();
     const dispose = await call('POST', `/assets/${drone.body.id}/lifecycle`, { action: 'dispose' });

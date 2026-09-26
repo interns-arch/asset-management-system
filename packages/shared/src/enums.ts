@@ -35,6 +35,9 @@ export type Condition = (typeof CONDITIONS)[number];
 export const OWNERSHIP_TYPES = ['OWNED', 'LEASED', 'RENTED', 'SUBSCRIPTION', 'LICENSED'] as const;
 export type OwnershipType = (typeof OWNERSHIP_TYPES)[number];
 
+/** What assets can be handed to in a single-branch company (no location / company holders). */
+export const ASSIGNABLE_HOLDERS = ['EMPLOYEE', 'DEPARTMENT', 'VENDOR', 'INVENTORY'] as const;
+
 export const HOLDER_TYPES = ['EMPLOYEE', 'DEPARTMENT', 'LOCATION', 'COMPANY', 'VENDOR', 'INVENTORY'] as const;
 export type HolderType = (typeof HOLDER_TYPES)[number];
 

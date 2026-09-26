@@ -3,7 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Field } from '@/components/common/form';
-import { EntityPicker, HolderPicker } from '@/components/common/pickers';
+import { HolderPicker } from '@/components/common/pickers';
 import { Button } from '@/components/ui/button';
 import { NativeSelect, Textarea } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/overlays';
@@ -12,7 +12,7 @@ import { useAuth } from '@/lib/auth';
 import { invalidateAssetData } from '@/lib/queries';
 import { plural } from '@/lib/utils';
 
-export type BulkKind = 'assign' | 'lifecycle' | 'move_location';
+export type BulkKind = 'assign' | 'lifecycle';
 
 const BULK_LIFECYCLE: LifecycleAction[] = ['receive', 'make_available', 'move_to_inventory', 'retire', 'reinstate', 'mark_lost', 'mark_found', 'dispose'];
 
@@ -28,7 +28,6 @@ export function BulkDialog({ kind, ids, onClose, onDone }: { kind: BulkKind | nu
   const [holderType, setHolderType] = useState<HolderType>('EMPLOYEE');
   const [holderId, setHolderId] = useState<string | null>(null);
   const [action, setAction] = useState<LifecycleAction>('make_available');
-  const [locationId, setLocationId] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
 
   const run = useMutation({
@@ -39,7 +38,6 @@ export function BulkDialog({ kind, ids, onClose, onDone }: { kind: BulkKind | nu
         holderType: kind === 'assign' ? holderType : undefined,
         holderId: kind === 'assign' ? holderId : undefined,
         lifecycleAction: kind === 'lifecycle' ? action : undefined,
-        locationId: kind === 'move_location' || (kind === 'lifecycle' && action === 'move_to_inventory') ? locationId : undefined,
         notes,
       }),
     onSuccess: async (r) => {
@@ -56,8 +54,8 @@ export function BulkDialog({ kind, ids, onClose, onDone }: { kind: BulkKind | nu
     onError: (err) => toast.error(errorMessage(err)),
   });
 
-  const ready = kind === 'assign' ? !!holderId : kind === 'move_location' ? !!locationId : action !== 'move_to_inventory' || !!locationId;
-  const title = kind === 'assign' ? 'Assign assets' : kind === 'move_location' ? 'Move to location' : 'Change status';
+  const ready = kind === 'assign' ? !!holderId || holderType === 'INVENTORY' : true;
+  const title = kind === 'assign' ? 'Assign assets' : 'Change status';
 
   return (
     <Dialog open={!!kind} onOpenChange={(o) => !o && onClose()}>
@@ -81,11 +79,6 @@ export function BulkDialog({ kind, ids, onClose, onDone }: { kind: BulkKind | nu
                   </option>
                 ))}
               </NativeSelect>
-            </Field>
-          )}
-          {(kind === 'move_location' || (kind === 'lifecycle' && action === 'move_to_inventory')) && (
-            <Field label={kind === 'move_location' ? 'New location' : 'Store / warehouse'}>
-              <EntityPicker kind={kind === 'move_location' ? 'LOCATION' : 'store'} value={locationId} onChange={setLocationId} />
             </Field>
           )}
           <Field label="Notes">

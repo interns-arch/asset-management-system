@@ -433,9 +433,6 @@ export class AssetsService {
 
       const pooled = type.trackingMode === 'QUANTITY';
       const wantsInventory = input.status === 'IN_INVENTORY';
-      if (wantsInventory && !pooled && !input.locationId) {
-        throw badRequest('Choose the store location for inventory', { locationId: 'Required for inventory' });
-      }
       const startStatus = wantsInventory ? (pooled ? 'AVAILABLE' : 'RECEIVED') : input.status;
       if (input.assignTo && startStatus !== 'AVAILABLE' && !wantsInventory) {
         throw badRequest('Only available assets can be assigned. Set the status to Available.', { status: 'Must be Available to assign' });
@@ -481,7 +478,7 @@ export class AssetsService {
       });
 
       if (wantsInventory && !pooled) {
-        await this.allocation.assign(actor, asset.id, { holderType: 'INVENTORY', holderId: input.locationId!, quantity: 1 });
+        await this.allocation.assign(actor, asset.id, { holderType: 'INVENTORY', holderId: input.locationId ?? null, quantity: 1 });
       }
       if (assignTo) {
         await this.allocation.assign(actor, asset.id, { holderType: assignTo.holderType, holderId: assignTo.holderId, quantity: 1 });

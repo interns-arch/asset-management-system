@@ -123,16 +123,11 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                 ))}
               </CommandGroup>
             )}
-            {!!(r?.departments.length || r?.locations.length || r?.vendors.length) && (
+            {!!(r?.departments.length || r?.vendors.length) && (
               <CommandGroup heading="Organisation">
                 {r!.departments.map((d) => (
                   <CommandItem key={d.id} value={`dept ${d.id} ${d.name}`} onSelect={() => go(`/assets?holderType=DEPARTMENT&holderId=${d.id}`)}>
                     <span className="text-muted-foreground">Department</span> {d.name}
-                  </CommandItem>
-                ))}
-                {r!.locations.map((l) => (
-                  <CommandItem key={l.id} value={`loc ${l.id} ${l.name}`} onSelect={() => go(`/assets?locationId=${l.id}`)}>
-                    <span className="text-muted-foreground">Location</span> {l.name}
                   </CommandItem>
                 ))}
                 {r!.vendors.map((v) => (

@@ -26,7 +26,6 @@ export default function OnboardingForm({ open, onOpenChange, defaults }: FormPro
     personalPhone: '',
     designation: '',
     departmentId: defaults?.departmentId ?? '',
-    locationId: defaults?.locationId ?? '',
     managerId: '',
     joinDate: '',
     notes: '',
@@ -34,7 +33,7 @@ export default function OnboardingForm({ open, onOpenChange, defaults }: FormPro
     items: [],
   });
   const e = (n: string) => errorOf(form, n);
-  const pick = (name: 'departmentId' | 'locationId' | 'managerId') => ({
+  const pick = (name: 'departmentId' | 'managerId') => ({
     value: (form.watch(name) as string) || null,
     onChange: (val: string | null) => form.setValue(name, val ?? '', { shouldDirty: true }),
   });
@@ -85,9 +84,6 @@ export default function OnboardingForm({ open, onOpenChange, defaults }: FormPro
           </Field>
           <Field label="Department" error={e('departmentId')}>
             <EntityPicker kind="DEPARTMENT" {...pick('departmentId')} />
-          </Field>
-          <Field label="Location" error={e('locationId')}>
-            <EntityPicker kind="LOCATION" {...pick('locationId')} />
           </Field>
           <Field label="Official email" error={e('email')} hint="If already created">
             <Input type="email" autoCapitalize="none" {...form.register('email')} />

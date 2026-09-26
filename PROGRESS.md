@@ -33,6 +33,9 @@ Tracks the build milestones so work can resume after any interruption.
 - [x] 15. Role + login when adding an employee; Leadership overview + Leadership role;
        onboarding for new joiners (plan, kits, prepare, hand over, mark joined) (2026-09-26)
 
+- [x] 16. New joiners approved by IT in Requests + assign all; sidebar by designation; company and
+       location fields removed for a single-branch company (2026-09-26)
+
 ## Possible next steps
 - AI assistant on top of the permission-checked API (the design already allows it)
 - Email notifications (SMTP) in addition to in-app notifications

@@ -98,10 +98,15 @@ only sees their own assets and QR. The IT role has full access.
   saved as a report (matched, mismatched, not in system, not in file) and notified to the team.
   The file is read in the browser and only the needed columns are sent; Aadhaar, PAN, bank details
   and addresses never leave the computer, and card numbers are masked.
-- **Onboarding** — HR adds a new joiner (status *Joining*) with the assets they should get, or
-  starts from a saved kit; *Send to IT* notifies IT and puts them in the priority queue by joining
-  date. IT sets assets aside and hands them over (with photos); *Mark joined* makes them Active and
-  turns anything not yet given into approved requests.
+- **New joiners** — HR adds the joiner (status *Joining*) with what they need (or a saved kit) and
+  sends it to IT. IT approves it — or sends it back with a note — under *Requests → New joiners*,
+  then assigns everything in one go (or item by item with photos). *Mark joined* makes them Active;
+  anything not yet given stays as an approved request.
+- **Sidebar by designation** — IT/Admin see the operational pages; HR sees Employees, New joiners
+  and Exits; managers see Dashboard, Employees and Requests; the CEO sees Leadership; employees
+  see only their own assets, requests, tickets and QR.
+- **One company, one branch** — no company or location fields; anything "in store" goes to the
+  single company store automatically.
 - **Leadership overview** — for the new *Leadership* role (CEO): headcount, joiners/leavers,
   assets in use, IT service health and what each IT team member handled, by 7/30/90 days or a year.
 - **Priority queue** — one worklist (`G Q`) of open tickets and requests to approve or fulfil,

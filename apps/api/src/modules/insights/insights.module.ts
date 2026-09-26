@@ -77,7 +77,7 @@ export class DashboardService {
     if (!can(actor, 'dashboard:view')) return this.personal(actor);
     const db = this.dbs.db;
     const now = today();
-    const [byStatus, byCategory, byLocation, byHolder, expiring, exits, counts, activity, byType] = await Promise.all([
+    const [byStatus, byCategory, byHolder, expiring, exits, counts, activity, byType] = await Promise.all([
       db.select({ status: assets.status, count: sql<number>`count(*)::int`, units: sql<number>`sum(${assets.quantity})::int` }).from(assets).groupBy(assets.status),
       db
         .select({
@@ -92,14 +92,6 @@ export class DashboardService {
         .leftJoin(assets, and(eq(assets.categoryId, assetCategories.id), sql`${assets.status} <> 'DISPOSED'`))
         .groupBy(assetCategories.id)
         .orderBy(desc(sql`count(${assets.id})`), asc(assetCategories.sortOrder)),
-      db
-        .select({ id: locations.id, name: locations.name, count: sql<number>`count(*)::int` })
-        .from(assets)
-        .innerJoin(locations, eq(locations.id, assets.locationId))
-        .where(sql`${assets.status} <> 'DISPOSED'`)
-        .groupBy(locations.id)
-        .orderBy(desc(sql`count(*)`))
-        .limit(8),
       db
         .select({ holderType: sql<string>`al.holder_type`, count: sql<number>`count(distinct al.asset_id)::int` })
         .from(sql`allocations al`)
@@ -195,7 +187,6 @@ export class DashboardService {
       },
       byStatus: statusMap,
       byCategory,
-      byLocation,
       byHolder: Object.fromEntries(byHolder.map((h) => [h.holderType, h.count])),
       byType,
       expiring,

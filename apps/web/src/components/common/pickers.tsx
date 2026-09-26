@@ -1,4 +1,4 @@
-import { HOLDER_TYPE_LABELS, HOLDER_TYPES, type HolderType } from '@eam/shared';
+import { ASSIGNABLE_HOLDERS, HOLDER_TYPE_LABELS, type HolderType } from '@eam/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, Loader2, Plus, X } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
@@ -300,7 +300,7 @@ export function HolderPicker({
   holderType,
   holderId,
   onChange,
-  allowed = HOLDER_TYPES,
+  allowed = ASSIGNABLE_HOLDERS,
   invalid,
   selectedLabel,
 }: {
@@ -327,11 +327,14 @@ export function HolderPicker({
               )}
             >
               <I className="size-3.5" />
-              {t === 'INVENTORY' ? 'Inventory' : HOLDER_TYPE_LABELS[t]}
+              {t === 'INVENTORY' ? 'In store' : HOLDER_TYPE_LABELS[t]}
             </button>
           );
         })}
       </div>
+      {holderType === 'INVENTORY' ? (
+        <p className="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">It goes back to the company store — not with anyone.</p>
+      ) : (
       <EntityPicker
         key={holderType}
         kind={holderType}
@@ -340,8 +343,9 @@ export function HolderPicker({
         selectedLabel={selectedLabel}
         onChange={(v) => onChange(holderType, v)}
         employeeFilter={{ status: 'ACTIVE,ON_LEAVE,NOTICE_PERIOD' }}
-        placeholder={holderType === 'INVENTORY' ? 'Choose the store / warehouse…' : `Choose ${HOLDER_TYPE_LABELS[holderType].toLowerCase()}…`}
+        placeholder={`Choose ${HOLDER_TYPE_LABELS[holderType].toLowerCase()}…`}
       />
+      )}
     </div>
   );
 }

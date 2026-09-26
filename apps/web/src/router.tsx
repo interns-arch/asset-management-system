@@ -125,7 +125,6 @@ export const router = createBrowserRouter([
           { path: 'activity', element: <ActivityPage /> },
           { path: 'settings/catalog', element: <CatalogPage /> },
           { path: 'settings/departments', element: <OrgPage kind="department" /> },
-          { path: 'settings/locations', element: <OrgPage kind="location" /> },
           { path: 'settings/vendors', element: <OrgPage kind="vendor" /> },
           { path: 'settings/users', element: <UsersPage /> },
           { path: 'settings/roles', element: <RolesPage /> },

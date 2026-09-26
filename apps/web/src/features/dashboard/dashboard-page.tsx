@@ -36,7 +36,6 @@ interface OrgDashboard {
   };
   byStatus: Partial<Record<AssetStatus, number>>;
   byCategory: { id: string; name: string; icon: string | null; color: string | null; count: number; assigned: number }[];
-  byLocation: { id: string; name: string; count: number }[];
   byHolder: Partial<Record<HolderType, number>>;
   byType: { id: string; name: string; icon: string | null; available: number; total: number }[];
   expiring: { id: string; assetTag: string; name: string; warrantyExpiry: string; holderName: string | null }[];
@@ -99,7 +98,6 @@ function QuickActions() {
 function OrgView({ data, name }: { data: OrgDashboard; name?: string }) {
   const t = data.totals;
   const statusTotal = ASSET_STATUSES.reduce((n, s) => n + (s === 'DISPOSED' ? 0 : data.byStatus[s] ?? 0), 0) || 1;
-  const maxLoc = Math.max(1, ...data.byLocation.map((l) => l.count));
   const utilisation = t.assets ? Math.round((t.assigned / t.assets) * 100) : 0;
   const { can } = useAuth();
 
@@ -249,32 +247,17 @@ function OrgView({ data, name }: { data: OrgDashboard; name?: string }) {
         <Card>
           <CardHeader>
             <div>
-              <CardTitle>Where assets are</CardTitle>
-              <CardDescription>By location and holder</CardDescription>
+              <CardTitle>Who has the assets</CardTitle>
+              <CardDescription>By holder</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <ul className="space-y-2">
-              {data.byLocation.map((l) => (
-                <li key={l.id}>
-                  <Link to={`/assets?locationId=${l.id}`} className="block text-sm hover:text-primary">
-                    <div className="flex justify-between">
-                      <span className="truncate">{l.name}</span>
-                      <span className="tabular text-muted-foreground">{l.count}</span>
-                    </div>
-                    <div className="mt-1 h-1.5 rounded-full bg-muted">
-                      <div className="h-full rounded-full bg-primary/70" style={{ width: `${(l.count / maxLoc) * 100}%` }} />
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-            <div className="flex flex-wrap gap-1.5 border-t pt-3">
+            <div className="flex flex-wrap gap-1.5">
               {(Object.entries(data.byHolder) as [HolderType, number][]).map(([h, n]) => {
                 const I = HOLDER_ICONS[h];
                 return (
                   <Link key={h} to={`/assets?holderType=${h}`} className="inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs hover:border-primary/40">
-                    <I className="size-3.5 text-muted-foreground" /> {HOLDER_TYPE_LABELS[h]} <span className="font-semibold tabular">{n}</span>
+                    <I className="size-3.5 text-muted-foreground" /> {h === 'INVENTORY' ? 'In store' : HOLDER_TYPE_LABELS[h]} <span className="font-semibold tabular">{n}</span>
                   </Link>
                 );
               })}

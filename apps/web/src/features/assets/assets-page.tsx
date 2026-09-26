@@ -4,12 +4,12 @@ import {
   CONDITIONS,
   formatAttributeValue,
   HOLDER_TYPE_LABELS,
-  HOLDER_TYPES,
+  ASSIGNABLE_HOLDERS,
   humanize,
   OWNERSHIP_TYPES,
 } from '@eam/shared';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRightLeft, Boxes, LayoutGrid, List, MapPin, Plus, Printer, ScanLine, Search, Tags, X } from 'lucide-react';
+import { ArrowRightLeft, Boxes, LayoutGrid, List, Plus, Printer, ScanLine, Search, Tags, X } from 'lucide-react';
 import { Fragment, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { AssetStatusBadge, HolderLabel } from '@/components/common/badges';
@@ -23,7 +23,7 @@ import { useQuickAdd } from '@/features/quick-add/quick-add';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { AssetIcon } from '@/lib/icons';
-import { queryClient, useAssetType, useAssetTypes, useCategories, useLocations } from '@/lib/queries';
+import { queryClient, useAssetType, useAssetTypes, useCategories } from '@/lib/queries';
 import type { AssetDetail, AssetListItem, AssetListResponse } from '@/lib/types';
 import { useSearchBox, useUrlFilters } from '@/lib/url-state';
 import { cn, daysUntil, formatDate, formatNumber, relativeTime } from '@/lib/utils';
@@ -64,7 +64,6 @@ export default function AssetsPage() {
   const [bulk, setBulk] = useState<BulkKind | null>(null);
   const categories = useCategories();
   const types = useAssetTypes();
-  const locations = useLocations();
   const selectedType = useAssetType(f.assetTypeId && !f.assetTypeId.includes(',') ? f.assetTypeId : null);
   const seesAll = can('asset:view');
 
@@ -127,13 +126,6 @@ export default function AssetsPage() {
           <HolderLabel type={a.holderType} name={a.holderName} className="max-w-52" />
         ),
     },
-    {
-      key: 'location',
-      header: 'Location',
-      sortKey: 'location',
-      hideOnMobile: true,
-      cell: (a) => (a.locationName ? <span className="inline-flex max-w-44 items-center gap-1 truncate text-muted-foreground"><MapPin className="size-3.5 shrink-0" />{a.locationName}</span> : <span className="text-muted-foreground">—</span>),
-    },
     ...customColumns.map<Column<AssetListItem>>((fd, i) => ({
       key: `f-${fd.key}`,
       header: fd.label,
@@ -161,7 +153,6 @@ export default function AssetsPage() {
   const activeFilters: { key: string; label: string }[] = [];
   if (f.categoryId) activeFilters.push({ key: 'categoryId', label: `Category: ${categories.data?.find((c) => c.id === f.categoryId)?.name ?? '…'}` });
   if (f.assetTypeId) activeFilters.push({ key: 'assetTypeId', label: `Type: ${types.data?.find((t) => t.id === f.assetTypeId)?.name ?? '…'}` });
-  if (f.locationId) activeFilters.push({ key: 'locationId', label: `Location: ${locations.data?.find((l) => l.id === f.locationId)?.name ?? '…'}` });
   if (f.holderType) activeFilters.push({ key: 'holderType', label: `Held by: ${HOLDER_TYPE_LABELS[f.holderType as keyof typeof HOLDER_TYPE_LABELS] ?? f.holderType}${f.holderId ? ' (one)' : ''}` });
   if (f.employeeId) activeFilters.push({ key: 'employeeId', label: 'Employee filter' });
   if (f.vendorId) activeFilters.push({ key: 'vendorId', label: 'Vendor filter' });
@@ -254,19 +245,11 @@ export default function AssetsPage() {
           <div className="w-44">
             <Combobox value={f.assetTypeId ?? null} onChange={(v) => set({ assetTypeId: v })} options={typeOptions} placeholder="All types" searchPlaceholder="Search types…" />
           </div>
-          <NativeSelect className="hidden w-auto min-w-36 md:block" value={f.locationId ?? ''} onChange={(e) => set({ locationId: e.target.value })} aria-label="Location">
-            <option value="">All locations</option>
-            {(locations.data ?? []).map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.name}
-              </option>
-            ))}
-          </NativeSelect>
           <NativeSelect className="hidden w-auto min-w-32 lg:block" value={f.holderType ?? ''} onChange={(e) => set({ holderType: e.target.value, holderId: null })} aria-label="Held by">
             <option value="">Any holder</option>
-            {HOLDER_TYPES.map((h) => (
+            {ASSIGNABLE_HOLDERS.map((h) => (
               <option key={h} value={h}>
-                {HOLDER_TYPE_LABELS[h]}
+                {h === 'INVENTORY' ? 'In store' : HOLDER_TYPE_LABELS[h]}
               </option>
             ))}
           </NativeSelect>
@@ -328,11 +311,6 @@ export default function AssetsPage() {
             {can('asset:lifecycle') && (
               <Button size="xs" variant="outline" onClick={() => setBulk('lifecycle')}>
                 <Tags /> Change status
-              </Button>
-            )}
-            {can('asset:edit') && (
-              <Button size="xs" variant="outline" onClick={() => setBulk('move_location')}>
-                <MapPin /> Move location
               </Button>
             )}
             <Button size="xs" variant="outline" onClick={() => navigate(`/labels?ids=${ids.join(',')}`)}>

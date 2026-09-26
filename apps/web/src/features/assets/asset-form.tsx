@@ -235,9 +235,6 @@ export default function AssetForm({ open, onOpenChange, record, defaults }: Form
                   </NativeSelect>
                 </Field>
               )}
-              <Field label={status === 'IN_INVENTORY' && !editing ? 'Store / warehouse' : 'Location'} required={status === 'IN_INVENTORY' && !editing} error={e('locationId')}>
-                <EntityPicker kind={status === 'IN_INVENTORY' ? 'store' : 'LOCATION'} value={(form.watch('locationId') as string) || null} onChange={(v) => form.setValue('locationId', v ?? '', { shouldDirty: true })} />
-              </Field>
             </div>
           </FormSection>
 
@@ -289,7 +286,7 @@ export default function AssetForm({ open, onOpenChange, record, defaults }: Form
                     <span className="flex items-center gap-2 text-sm font-semibold">
                       <UserPlus className="size-4" /> Assign now
                     </span>
-                    <span className="text-xs text-muted-foreground">Hand it to an employee, department, location, company or vendor in the same step.</span>
+                    <span className="text-xs text-muted-foreground">Hand it to an employee, department or vendor in the same step.</span>
                   </span>
                   <Switch checked={assignNow} onCheckedChange={setAssignNow} />
                 </label>
@@ -299,7 +296,7 @@ export default function AssetForm({ open, onOpenChange, record, defaults }: Form
                       holderType={holderType}
                       holderId={holderId}
                       selectedLabel={holderId === defaults?.holderId ? defaults?.holderLabel : undefined}
-                      allowed={pooled ? ['EMPLOYEE', 'DEPARTMENT', 'LOCATION', 'COMPANY', 'VENDOR'] : undefined}
+                      allowed={['EMPLOYEE', 'DEPARTMENT', 'VENDOR']}
                       invalid={!!holderError}
                       onChange={(t, id) => {
                         setHolderType(t);

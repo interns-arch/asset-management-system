@@ -1,11 +1,11 @@
-import { type Condition, CONDITIONS, type HolderType, HOLDER_TYPES, humanize, LIFECYCLE, type LifecycleAction } from '@eam/shared';
+import { ASSIGNABLE_HOLDERS, type Condition, CONDITIONS, type HolderType, humanize, LIFECYCLE, type LifecycleAction } from '@eam/shared';
 import { useMutation } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { HolderLabel } from '@/components/common/badges';
 import { Field } from '@/components/common/form';
 import { PhotoPicker, uploadPhotos } from '@/components/common/photos';
-import { EntityPicker, HolderPicker } from '@/components/common/pickers';
+import { HolderPicker } from '@/components/common/pickers';
 import { Button } from '@/components/ui/button';
 import { Input, Textarea } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/overlays';
@@ -87,11 +87,11 @@ function AssignBody({ dialog, onClose, onDone }: { dialog: Extract<AssetDialog, 
   const [photos, setPhotos] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const action = useAction(onClose, onDone);
-  const allowed = pooled ? HOLDER_TYPES.filter((t) => t !== 'INVENTORY') : HOLDER_TYPES;
+  const allowed = pooled ? ASSIGNABLE_HOLDERS.filter((t) => t !== 'INVENTORY') : ASSIGNABLE_HOLDERS;
   const from = transfer ? (dialog.allocation?.holderName ?? dialog.asset.holderName) : null;
 
   const submit = () => {
-    if (!holderId) return setError('Choose who receives it');
+    if (!holderId && holderType !== 'INVENTORY') return setError('Choose who receives it');
     action.mutate(
       {
         path: `/assets/${dialog.asset.id}/${transfer ? 'transfer' : 'assign'}`,
@@ -234,9 +234,7 @@ function ReturnBody({ dialog, onClose, onDone }: { dialog: Extract<AssetDialog, 
 function LifecycleBody({ dialog, onClose, onDone }: { dialog: Extract<AssetDialog, { kind: 'lifecycle' }>; onClose: () => void; onDone?: () => void }) {
   const rule = LIFECYCLE[dialog.action];
   const [notes, setNotes] = useState('');
-  const [locationId, setLocationId] = useState<string | null>(null);
   const action = useAction(onClose, onDone);
-  const needsStore = dialog.action === 'move_to_inventory';
   const danger = rule.tone === 'danger';
 
   return (
@@ -248,11 +246,6 @@ function LifecycleBody({ dialog, onClose, onDone }: { dialog: Extract<AssetDialo
         </DialogDescription>
       </DialogHeader>
       <div className="grid gap-4">
-        {needsStore && (
-          <Field label="Store / warehouse" required>
-            <EntityPicker kind="store" value={locationId} onChange={setLocationId} />
-          </Field>
-        )}
         {dialog.asset.holderName && (dialog.action === 'mark_lost' || dialog.action === 'retire') && (
           <p className="rounded-md bg-muted px-3 py-2 text-sm">
             Currently held by <HolderLabel type={dialog.asset.holderType ?? null} name={dialog.asset.holderName} className="font-medium" />. Their assignment will be closed.
@@ -270,10 +263,9 @@ function LifecycleBody({ dialog, onClose, onDone }: { dialog: Extract<AssetDialo
         <Button
           variant={danger ? 'destructive' : 'default'}
           loading={action.isPending}
-          disabled={needsStore && !locationId}
           onClick={() =>
             action.mutate(
-              { path: `/assets/${dialog.asset.id}/lifecycle`, body: { action: dialog.action, notes, locationId } },
+              { path: `/assets/${dialog.asset.id}/lifecycle`, body: { action: dialog.action, notes } },
               { onSuccess: () => toast.success(`${rule.label}: ${dialog.asset.assetTag}`) },
             )
           }

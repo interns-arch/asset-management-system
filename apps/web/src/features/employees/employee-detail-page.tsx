@@ -128,9 +128,7 @@ export default function EmployeeDetailPage() {
         <DetailList
           columns={1}
           items={[
-            { label: 'Company', value: e.companyName },
             { label: 'Department', value: e.departmentName },
-            { label: 'Location / branch', value: e.locationName },
             { label: 'Reports to', value: e.managerName },
             { label: 'Joined', value: e.joinDate && formatDate(e.joinDate) },
             ...(e.noticeDate ? [{ label: 'Notice given', value: formatDate(e.noticeDate) }] : []),
@@ -177,7 +175,7 @@ export default function EmployeeDetailPage() {
               <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{e.employeeCode}</span>
               <EmployeeStatusBadge status={e.status} />
             </div>
-            <p className="mt-1.5 text-sm text-muted-foreground">{[e.designation, e.departmentName, e.locationName].filter(Boolean).join(' · ') || '—'}</p>
+            <p className="mt-1.5 text-sm text-muted-foreground">{[e.designation, e.departmentName].filter(Boolean).join(' · ') || '—'}</p>
           </div>
           {(can('employee:status') || can('employee:manage')) && (
             <DropdownMenu>

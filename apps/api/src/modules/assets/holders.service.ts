@@ -29,8 +29,10 @@ const EMPTY = { employeeId: null, departmentId: null, locationId: null, companyI
 export class HoldersService {
   constructor(private readonly dbs: DbService) {}
 
-  async resolve(holderType: HolderType, holderId: string): Promise<ResolvedHolder> {
+  async resolve(holderType: HolderType, rawHolderId: string | null | undefined): Promise<ResolvedHolder> {
     const db = this.dbs.db;
+    const holderId = rawHolderId || (holderType === 'INVENTORY' ? await this.dbs.defaultStoreId() : null);
+    if (!holderId) throw badRequest('Choose who receives it', { holderId: 'Required' });
     switch (holderType) {
       case 'EMPLOYEE': {
         const [e] = await db

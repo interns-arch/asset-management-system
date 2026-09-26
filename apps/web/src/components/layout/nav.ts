@@ -11,7 +11,6 @@ import {
   LifeBuoy,
   ListOrdered,
   LogOut,
-  MapPin,
   ScanLine,
   Shapes,
   ShieldCheck,
@@ -62,7 +61,6 @@ export const MAIN_NAV: NavItem[] = [
 export const SETTINGS_NAV: NavItem[] = [
   { label: 'Asset catalog', to: '/settings/catalog', icon: Shapes, perms: ['catalog:manage'] },
   { label: 'Departments', to: '/settings/departments', icon: Briefcase, perms: ['org:manage'] },
-  { label: 'Locations', to: '/settings/locations', icon: MapPin, perms: ['org:manage'] },
   { label: 'Vendors', to: '/settings/vendors', icon: Truck, perms: ['org:manage'] },
   { label: 'Users', to: '/settings/users', icon: UsersRound, perms: ['user:manage'] },
   { label: 'Roles & permissions', to: '/settings/roles', icon: ShieldCheck, perms: ['user:manage'] },
@@ -83,7 +81,6 @@ export const QUICK_ADD: QuickAddItem[] = [
   { kind: 'assetType', label: 'Asset type', perms: ['catalog:manage'] },
   { kind: 'category', label: 'Category', perms: ['catalog:manage'] },
   { kind: 'department', label: 'Department', perms: ['org:manage'] },
-  { kind: 'location', label: 'Location', perms: ['org:manage'] },
   { kind: 'vendor', label: 'Vendor', perms: ['org:manage'] },
   { kind: 'request', label: 'Request', perms: ['request:create'], show: (can) => isIT(can) || isEmployeeOnly(can) || can('request:approve') },
   { kind: 'ticket', label: 'Ticket', perms: ['ticket:create'], show: (can) => isIT(can) || isEmployeeOnly(can) },

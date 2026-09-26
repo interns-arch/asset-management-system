@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { asc } from 'drizzle-orm';
+import { asc, desc } from 'drizzle-orm';
 import pg from 'pg';
 import * as schema from './schema';
 
@@ -51,6 +51,18 @@ export class DbService implements OnModuleDestroy {
   async defaultCompanyId(): Promise<string | null> {
     const [row] = await this.db.select({ id: schema.companies.id }).from(schema.companies).orderBy(asc(schema.companies.createdAt)).limit(1);
     return row?.id ?? null;
+  }
+
+  /** The company's store for anything "in store"; created on first use if there is none. */
+  async defaultStoreId(): Promise<string> {
+    const [store] = await this.db
+      .select({ id: schema.locations.id })
+      .from(schema.locations)
+      .orderBy(desc(schema.locations.isStore), asc(schema.locations.createdAt))
+      .limit(1);
+    if (store) return store.id;
+    const [created] = await this.db.insert(schema.locations).values({ name: 'Main store', type: 'WAREHOUSE', isStore: true }).returning({ id: schema.locations.id });
+    return created.id;
   }
 
   async onModuleDestroy() {

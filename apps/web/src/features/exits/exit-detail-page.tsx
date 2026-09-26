@@ -401,11 +401,6 @@ export default function ExitDetailPage() {
                   <span className="text-muted-foreground">Email:</span> {x.employee.email}
                 </p>
               )}
-              {x.employee.locationName && (
-                <p>
-                  <span className="text-muted-foreground">Location:</span> {x.employee.locationName}
-                </p>
-              )}
             </CardContent>
           </Card>
           {blocking > 0 && open && !can('exit:override') && (

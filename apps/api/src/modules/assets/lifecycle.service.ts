@@ -40,10 +40,9 @@ export class LifecycleService {
       case 'complete_maintenance':
         throw badRequest('Use the maintenance module for this action.');
       case 'move_to_inventory':
-        if (!input.locationId) throw badRequest('Choose the store location', { locationId: 'Required' });
         return this.allocation.assign(actor, assetId, {
           holderType: 'INVENTORY',
-          holderId: input.locationId,
+          holderId: input.locationId ?? null,
           quantity: 1,
           notes: input.notes ?? null,
         });
