@@ -93,6 +93,8 @@ export function lanAddress() {
 /** Base URL printed into QR codes. PUBLIC_URL wins; otherwise the LAN address. */
 export function publicUrl(port) {
   if (process.env.PUBLIC_URL) return process.env.PUBLIC_URL.replace(/\/+$/, '');
+  // Render (and similar hosts) give the public https address; QR codes must point there.
+  if (process.env.RENDER_EXTERNAL_URL) return process.env.RENDER_EXTERNAL_URL.replace(/\/+$/, '');
   const ip = lanAddress();
   return ip ? `http://${ip}:${port}` : null;
 }

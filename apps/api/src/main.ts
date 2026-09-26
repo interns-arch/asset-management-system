@@ -16,7 +16,8 @@ export async function createApp() {
     logger: process.env.NODE_ENV === 'test' ? ['error'] : ['warn', 'error'],
   });
   app.setGlobalPrefix('api');
-  app.set('trust proxy', 'loopback');
+  // Behind a hosting proxy (Render) the client address and https come from X-Forwarded-*.
+  app.set('trust proxy', process.env.RENDER || process.env.TRUST_PROXY === 'true' ? 1 : 'loopback');
   app.disable('x-powered-by');
   app.use(
     helmet({

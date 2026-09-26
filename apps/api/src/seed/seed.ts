@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { randomBytes } from 'node:crypto';
 import { NestFactory } from '@nestjs/core';
 import { eq, sql } from 'drizzle-orm';
 import { type Attributes, type HolderType, type Permission, SYSTEM_ROLES } from '@eam/shared';
@@ -39,6 +40,35 @@ const deviceId = () => `${hex(8)}-${hex(4)}-${hex(4)}-${hex(4)}-${hex(12)}`;
 const FIRST = ['Aarav', 'Vivaan', 'Aditya', 'Ananya', 'Diya', 'Ishaan', 'Kavya', 'Rohan', 'Sneha', 'Arjun', 'Meera', 'Nikhil', 'Pooja', 'Siddharth', 'Tanvi', 'Varun', 'Riya', 'Harsh', 'Divya', 'Kunal', 'Aisha', 'Manish', 'Shreya', 'Yash', 'Nisha', 'Gaurav', 'Priya', 'Amit', 'Swati', 'Rajesh'];
 const LAST = ['Patel', 'Iyer', 'Gupta', 'Reddy', 'Nair', 'Joshi', 'Kulkarni', 'Desai', 'Menon', 'Chopra', 'Bose', 'Pillai', 'Verma', 'Shetty', 'Bhat', 'Agarwal', 'Mishra', 'Khanna'];
 
+/** The starter asset catalog (categories, types, custom fields) — the same for demo and live installs. */
+async function loadCatalog(catalog: CatalogService, admin: Actor) {
+  const types: Record<string, { id: string; trackingMode: string }> = {};
+  for (const c of CATALOG) {
+    const cat = await catalog.createCategory(admin, { name: c.name, code: c.code, icon: c.icon, color: c.color, description: c.description });
+    for (const f of c.fields ?? []) {
+      await catalog.createField(admin, { ...f, categoryId: cat.id, required: f.required ?? false, isUnique: f.isUnique ?? false, showInTable: f.showInTable ?? false, filterable: true, options: f.options ?? null });
+    }
+    for (const t of c.types) {
+      const type = await catalog.createType(admin, { categoryId: cat.id, name: t.name, code: t.code, icon: t.icon, description: t.description ?? null, trackingMode: t.trackingMode ?? 'INDIVIDUAL', consumable: t.consumable ?? false });
+      types[t.code] = { id: type.id, trackingMode: type.trackingMode };
+      for (const f of t.fields ?? []) {
+        await catalog.createField(admin, { ...f, assetTypeId: type.id, required: f.required ?? false, isUnique: f.isUnique ?? false, showInTable: f.showInTable ?? false, filterable: true, options: f.options ?? null });
+      }
+    }
+  }
+  return types;
+}
+
+const DEPARTMENTS: [string, string][] = [
+  ['IT and Data', 'ITD'],
+  ['Inside and Field Sales', 'SAL'],
+  ['Human Resources', 'HR'],
+  ['Accounts and Finance', 'FIN'],
+  ['IT Support', 'ITS'],
+  ['Operations', 'OPS'],
+  ['Warehouse', 'WH'],
+];
+
 async function main() {
   const app = await NestFactory.createApplicationContext(AppModule, { logger: ['error', 'warn'] });
   const dbs = app.get(DbService);
@@ -69,18 +99,31 @@ async function main() {
     roleIds[r.name] = row.id;
   }
 
-  // Production bootstrap: roles + one admin from the environment, no demo data.
+  // Live install: roles, the first admin, the company, departments and the asset catalog — no demo data.
   if (process.argv.includes('--bootstrap')) {
-    const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
-    const password = process.env.ADMIN_PASSWORD ?? '';
-    if (!email || password.length < 8) {
-      console.error('✖ Set ADMIN_EMAIL and ADMIN_PASSWORD (min 8 characters) to create the first admin.');
+    const login = (process.env.ADMIN_EMAIL ?? process.env.ADMIN_LOGIN ?? 'admin').trim().toLowerCase();
+    // Without ADMIN_PASSWORD a one-time password is generated and printed once in the server log.
+    const generated = !process.env.ADMIN_PASSWORD;
+    const password = process.env.ADMIN_PASSWORD ?? randomBytes(9).toString('base64url');
+    if (password.length < 8) {
+      console.error('✖ ADMIN_PASSWORD must be at least 8 characters.');
       process.exitCode = 1;
       await app.close();
       return;
     }
-    await dbs.root.insert(users).values({ email, name: process.env.ADMIN_NAME ?? 'Administrator', passwordHash: await hashPassword(password), roleId: roleIds.Admin });
-    console.log(`✔ Created roles and the first admin (${email}). Build your catalog under Settings → Asset catalog.`);
+    const isEmail = login.includes('@');
+    const [first] = await dbs.root
+      .insert(users)
+      .values({ email: isEmail ? login : null, username: isEmail ? null : login, name: process.env.ADMIN_NAME ?? 'Administrator', passwordHash: await hashPassword(password), roleId: roleIds.Admin })
+      .returning();
+    const actor: Actor = { userId: first.id, name: first.name, email: first.email, employeeId: null, roleName: 'Admin', permissions: new Set(SYSTEM_ROLES[0].permissions as Permission[]) };
+    const company = (await org.create('companies', actor, { name: process.env.COMPANY_NAME ?? 'CARTREND AUTOPARTS PVT LTD', code: 'CARTREND' })) as { id: string };
+    await org.create('locations', actor, { name: 'Main store', code: 'STORE', type: 'WAREHOUSE', isStore: true, companyId: company.id });
+    for (const [name, deptCode] of DEPARTMENTS) await org.create('departments', actor, { name, code: deptCode, companyId: company.id });
+    await loadCatalog(catalog, actor);
+    console.log('✔ Live install ready: roles, company, departments and the asset catalog (no demo data).');
+    console.log(`✔ First admin — sign in with: ${login}`);
+    if (generated) console.log(`  One-time password: ${password}   ← change it after signing in (top-right menu → Change password)`);
     await app.close();
     return;
   }
@@ -150,20 +193,7 @@ async function main() {
   };
 
   // ── Catalog ─────────────────────────────────────────────────────────────
-  const types: Record<string, { id: string; trackingMode: string }> = {};
-  for (const c of CATALOG) {
-    const cat = await catalog.createCategory(admin, { name: c.name, code: c.code, icon: c.icon, color: c.color, description: c.description });
-    for (const f of c.fields ?? []) {
-      await catalog.createField(admin, { ...f, categoryId: cat.id, required: f.required ?? false, isUnique: f.isUnique ?? false, showInTable: f.showInTable ?? false, filterable: true, options: f.options ?? null });
-    }
-    for (const t of c.types) {
-      const type = await catalog.createType(admin, { categoryId: cat.id, name: t.name, code: t.code, icon: t.icon, description: t.description ?? null, trackingMode: t.trackingMode ?? 'INDIVIDUAL', consumable: t.consumable ?? false });
-      types[t.code] = { id: type.id, trackingMode: type.trackingMode };
-      for (const f of t.fields ?? []) {
-        await catalog.createField(admin, { ...f, assetTypeId: type.id, required: f.required ?? false, isUnique: f.isUnique ?? false, showInTable: f.showInTable ?? false, filterable: true, options: f.options ?? null });
-      }
-    }
-  }
+  const types = await loadCatalog(catalog, admin);
 
   // ── Employees & logins ──────────────────────────────────────────────────
   let code = 0;

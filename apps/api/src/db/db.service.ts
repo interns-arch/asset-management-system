@@ -17,13 +17,22 @@ export function databaseUrl(): string {
   return process.env.DATABASE_URL ?? 'postgres://postgres:postgres@localhost:5433/eam';
 }
 
+/** Remote Postgres (Render, Supabase, RDS, ...) needs TLS; the bundled local one does not. */
+export function databaseSsl(): { rejectUnauthorized: boolean } | undefined {
+  if (process.env.PGSSLMODE === 'disable') return undefined;
+  const url = databaseUrl();
+  const isLocal = /^postgres:\/\/[^@]+@(localhost|127\.0\.0\.1|\[::1\])/.test(url);
+  if (isLocal && process.env.PGSSLMODE !== 'require') return undefined;
+  return { rejectUnauthorized: false };
+}
+
 /**
  * Owns the connection pool. `db` returns the transaction bound to the current async context
  * (if any), so services can call each other inside one transaction without passing it around.
  */
 @Injectable()
 export class DbService implements OnModuleDestroy {
-  readonly pool = new pg.Pool({ connectionString: databaseUrl(), max: Number(process.env.DB_POOL_SIZE ?? 20) });
+  readonly pool = new pg.Pool({ connectionString: databaseUrl(), ssl: databaseSsl(), max: Number(process.env.DB_POOL_SIZE ?? 20) });
   readonly root: Database = drizzle(this.pool, { schema });
   private readonly als = new AsyncLocalStorage<Tx>();
 

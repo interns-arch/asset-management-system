@@ -2,10 +2,10 @@ import path from 'node:path';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import pg from 'pg';
-import { databaseUrl } from './db.service';
+import { databaseSsl, databaseUrl } from './db.service';
 
 export async function runMigrations(url = databaseUrl()) {
-  const pool = new pg.Pool({ connectionString: url, max: 1 });
+  const pool = new pg.Pool({ connectionString: url, ssl: databaseSsl(), max: 1 });
   try {
     await migrate(drizzle(pool), { migrationsFolder: path.resolve(__dirname, '../../drizzle') });
   } finally {

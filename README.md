@@ -151,18 +151,31 @@ Key design points:
 
 ```bash
 npm run build
-DATABASE_URL=postgres://user:pass@host:5432/eam SEED_DEMO=false \
-  ADMIN_EMAIL=you@company.com ADMIN_PASSWORD='a-strong-password' npm start
+DATABASE_URL=postgres://user:pass@host:5432/eam SEED_DEMO=false ADMIN_LOGIN=admin npm start
 ```
 
-| Variable        | Default                                   | Notes                                   |
-| --------------- | ----------------------------------------- | --------------------------------------- |
-| `DATABASE_URL`  | bundled local PostgreSQL                  | Any PostgreSQL 16+                      |
-| `PORT`          | `3000`                                    | API + web app port                      |
-| `PUBLIC_URL`    | this PC's Wi-Fi address                   | Address printed into QR codes — set it to the server's real URL |
-| `SEED_DEMO`     | `true`                                    | `false`: no demo data; creates roles + the first admin from `ADMIN_EMAIL` / `ADMIN_PASSWORD` |
-| `COOKIE_SECURE` | `true` in production                      | Set `false` only when not behind HTTPS  |
-| `DB_POOL_SIZE`  | `20`                                      | Connections per API instance            |
-| `UPLOAD_DIR`    | `./.data/uploads`                         | Where handover / return photos are stored — include it in backups |
+On a **fresh database** with `SEED_DEMO=false` the first start creates the live setup: roles,
+the company, departments, one store and the full asset catalog — no demo people or assets —
+plus the first admin. Without `ADMIN_PASSWORD`, a one-time password is printed once in the
+server log; sign in and change it (top-right menu → Change password).
+
+### Render (free) from GitHub
+
+- **Build:** `npm ci --include=dev && npm run build` · **Start:** `npm start` · Node 22 (`.node-version`)
+- **Env:** `DATABASE_URL` (Render Postgres internal URL), `SEED_DEMO=false`, `ADMIN_LOGIN=admin`
+- QR codes use Render's public address automatically; TLS to the database is on for remote hosts.
+- Free tier: sleeps when idle, free Postgres expires after ~30 days, uploaded photos are lost on
+  restart — fine for trials, use paid plans for real use.
+
+| Variable        | Default                  | Notes                                            |
+| --------------- | ------------------------ | ------------------------------------------------ |
+| `DATABASE_URL`  | bundled local PostgreSQL | Any PostgreSQL 16+                               |
+| `PORT`          | `3000`                   | API + web app port                               |
+| `PUBLIC_URL`    | Render URL / Wi-Fi IP    | Address printed into QR codes                    |
+| `SEED_DEMO`     | `true`                   | `false`: live setup, no demo data                |
+| `ADMIN_LOGIN`   | `admin`                  | First admin's login ID (or use `ADMIN_EMAIL`)    |
+| `ADMIN_PASSWORD`| generated                | Optional; otherwise printed once in the log      |
+| `COOKIE_SECURE` | `true` in production     | Set `false` only when not behind HTTPS           |
+| `UPLOAD_DIR`    | `./.data/uploads`        | Handover / return photos — include in backups    |
 
 Seeding only runs on an empty database, so restarts never touch existing data.
