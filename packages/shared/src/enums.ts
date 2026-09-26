@@ -71,9 +71,17 @@ export type ExitCaseStatus = (typeof EXIT_CASE_STATUSES)[number];
 export const EXIT_ITEM_STATUSES = ['PENDING', 'RETURNED', 'DAMAGED', 'MISSING'] as const;
 export type ExitItemStatus = (typeof EXIT_ITEM_STATUSES)[number];
 
-export const ONBOARDING_STATUSES = ['DRAFT', 'SUBMITTED', 'COMPLETED', 'CANCELLED'] as const;
+/** DRAFT (HR) → SUBMITTED (waiting for IT approval) → APPROVED (IT assigning) → COMPLETED (joined) · CANCELLED. */
+export const ONBOARDING_STATUSES = ['DRAFT', 'SUBMITTED', 'APPROVED', 'COMPLETED', 'CANCELLED'] as const;
 export type OnboardingStatus = (typeof ONBOARDING_STATUSES)[number];
-export const ONBOARDING_STATUS_LABELS: Record<OnboardingStatus, string> = { DRAFT: 'Planning (HR)', SUBMITTED: 'With IT', COMPLETED: 'Joined', CANCELLED: 'Cancelled' };
+export const ONBOARDING_OPEN_STATUSES: readonly OnboardingStatus[] = ['DRAFT', 'SUBMITTED', 'APPROVED'];
+export const ONBOARDING_STATUS_LABELS: Record<OnboardingStatus, string> = {
+  DRAFT: 'Draft (HR)',
+  SUBMITTED: 'Waiting for IT approval',
+  APPROVED: 'Approved — assigning',
+  COMPLETED: 'Joined',
+  CANCELLED: 'Cancelled',
+};
 
 export const ONBOARDING_ITEM_STATUSES = ['PLANNED', 'PREPARED', 'ISSUED', 'SKIPPED'] as const;
 export type OnboardingItemStatus = (typeof ONBOARDING_ITEM_STATUSES)[number];

@@ -1,5 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, Module, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import {
+  onboardingAssignAllSchema,
+  type OnboardingAssignAllInput,
   onboardingCancelSchema,
   onboardingCreateSchema,
   type OnboardingCreateInput,
@@ -11,6 +13,7 @@ import {
   type OnboardingItemUpdateInput,
   onboardingKitSchema,
   type OnboardingKitInput,
+  onboardingReturnSchema,
   onboardingUpdateSchema,
   type OnboardingUpdateInput,
 } from '@eam/shared';
@@ -84,10 +87,22 @@ export class OnboardingController {
     return this.onboarding.issueItem(actor, id, itemId, body);
   }
 
-  @Post(':id/issue-prepared')
+  @Post(':id/assign-all')
   @HttpCode(200)
-  issuePrepared(@CurrentActor() actor: Actor, @Param('id', ParseUUIDPipe) id: string) {
-    return this.onboarding.issuePrepared(actor, id);
+  assignAll(@CurrentActor() actor: Actor, @Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(onboardingAssignAllSchema)) body: OnboardingAssignAllInput) {
+    return this.onboarding.assignAll(actor, id, body);
+  }
+
+  @Post(':id/approve')
+  @HttpCode(200)
+  approve(@CurrentActor() actor: Actor, @Param('id', ParseUUIDPipe) id: string) {
+    return this.onboarding.approve(actor, id);
+  }
+
+  @Post(':id/send-back')
+  @HttpCode(200)
+  sendBack(@CurrentActor() actor: Actor, @Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(onboardingReturnSchema)) body: { note: string }) {
+    return this.onboarding.sendBack(actor, id, body.note);
   }
 
   @Post(':id/submit')

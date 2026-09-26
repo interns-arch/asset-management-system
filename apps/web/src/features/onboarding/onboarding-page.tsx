@@ -1,6 +1,7 @@
 import { ONBOARDING_STATUS_LABELS } from '@eam/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, Search, UserPlus } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { EnumBadge } from '@/components/common/badges';
 import { type Column, DataTable, Pagination } from '@/components/common/data-table';
@@ -16,14 +17,6 @@ import type { OnboardingListItem } from '@/lib/types';
 import { useSearchBox, useUrlFilters } from '@/lib/url-state';
 import { cn, daysUntil, formatDate } from '@/lib/utils';
 
-const TABS = [
-  { value: 'DRAFT,SUBMITTED', label: 'Upcoming' },
-  { value: 'DRAFT', label: 'Planning (HR)' },
-  { value: 'SUBMITTED', label: 'With IT' },
-  { value: 'COMPLETED', label: 'Joined' },
-  { value: 'CANCELLED', label: 'Cancelled' },
-];
-
 export function JoinsIn({ date, className }: { date: string; className?: string }) {
   const d = daysUntil(date) ?? 0;
   return (
@@ -33,14 +26,14 @@ export function JoinsIn({ date, className }: { date: string; className?: string 
   );
 }
 
-export default function OnboardingPage() {
+const OPEN = ['DRAFT', 'SUBMITTED', 'APPROVED'];
+
+/** Joiner list with status tabs and search; used by HR's New joiners page and IT's Requests → New joiners. */
+export function OnboardingTable({ tabs, defaultStatus, empty }: { tabs: { value: string; label: string }[]; defaultStatus: string; empty: ReactNode }) {
   const navigate = useNavigate();
-  const quickAdd = useQuickAdd();
-  const { can } = useAuth();
-  const { values: f, set } = useUrlFilters({ status: 'DRAFT,SUBMITTED', page: '1', pageSize: '25' });
+  const { values: f, set } = useUrlFilters({ status: defaultStatus, page: '1', pageSize: '25' });
   const [search, setSearch] = useSearchBox(f.search ?? '', (v) => set({ search: v }));
-  const q = useQuery({ queryKey: ['onboarding', f], queryFn: () => api.get<Page<OnboardingListItem>>('/onboarding', f) });
-  const open = f.status === 'DRAFT,SUBMITTED' || f.status === 'DRAFT' || f.status === 'SUBMITTED';
+  const q = useQuery({ queryKey: ['onboarding', f], queryFn: () => api.get<Page<OnboardingListItem>>('/onboarding', { ...f, view: undefined }) });
 
   const columns: Column<OnboardingListItem>[] = [
     {
@@ -66,25 +59,25 @@ export default function OnboardingPage() {
       cell: (o) => (
         <div className="flex flex-col">
           <span className="whitespace-nowrap">{formatDate(o.joinDate)}</span>
-          {o.status === 'DRAFT' || o.status === 'SUBMITTED' ? <JoinsIn date={o.joinDate} /> : null}
+          {OPEN.includes(o.status) ? <JoinsIn date={o.joinDate} /> : null}
         </div>
       ),
     },
     {
-      key: 'ready',
-      header: 'Prepared',
+      key: 'items',
+      header: 'Items',
       hideOnMobile: true,
       cell: (o) => {
-        const done = o.itemsPrepared + o.itemsIssued + o.itemsSkipped;
+        const done = o.itemsIssued + o.itemsSkipped;
         return o.itemsTotal ? (
           <div className="w-32">
             <div className="mb-1 text-xs text-muted-foreground">
-              {done} of {o.itemsTotal} ready{o.itemsIssued ? ` · ${o.itemsIssued} given` : ''}
+              {o.itemsIssued} of {o.itemsTotal - o.itemsSkipped} assigned
             </div>
             <Progress value={(done / o.itemsTotal) * 100} indicatorClassName={done === o.itemsTotal ? 'bg-emerald-500' : undefined} />
           </div>
         ) : (
-          <span className="text-xs text-muted-foreground">Nothing planned yet</span>
+          <span className="text-xs text-muted-foreground">Nothing listed yet</span>
         );
       },
     },
@@ -92,17 +85,10 @@ export default function OnboardingPage() {
     { key: 'case', header: 'Case', hideOnMobile: true, cell: (o) => <span className="font-mono text-xs text-muted-foreground">{o.caseNumber}</span> },
   ];
 
-  const newJoiner = can('onboarding:manage') && (
-    <Button size="sm" onClick={() => quickAdd.open('onboarding')}>
-      <Plus /> New joiner
-    </Button>
-  );
-
   return (
-    <div>
-      <PageHeader title="Onboarding" description="Get everything ready before a new joiner’s first day: HR lists what they need, IT prepares it, it’s handed over on day 1." actions={newJoiner} />
+    <>
       <div className="mb-3 flex gap-1 overflow-x-auto pb-1 no-scrollbar">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.value}
             type="button"
@@ -133,10 +119,38 @@ export default function OnboardingPage() {
           onRetry={() => q.refetch()}
           onRowClick={(o) => navigate(`/onboarding/${o.id}`)}
           keyboard
-          empty={<EmptyState icon={UserPlus} title={open ? 'No one joining soon' : 'Nothing here'} description={open ? 'Add a new joiner to plan their first day.' : undefined} action={open ? newJoiner || undefined : undefined} />}
+          empty={empty}
         />
         {q.data && q.data.total > 0 && <Pagination page={q.data.page} pageSize={q.data.pageSize} total={q.data.total} onPageChange={(p) => set({ page: p }, { keepPage: true })} />}
       </Card>
+    </>
+  );
+}
+
+/** HR's page: add joiners and follow them until they join. */
+export default function OnboardingPage() {
+  const quickAdd = useQuickAdd();
+  const { can } = useAuth();
+  const newJoiner = can('onboarding:manage') && (
+    <Button size="sm" onClick={() => quickAdd.open('onboarding')}>
+      <Plus /> New joiner
+    </Button>
+  );
+  return (
+    <div>
+      <PageHeader title="New joiners" description="Tell IT who is joining and what they need. IT approves it, assigns everything, and you mark them as joined on day 1." actions={newJoiner} />
+      <OnboardingTable
+        defaultStatus="DRAFT,SUBMITTED,APPROVED"
+        tabs={[
+          { value: 'DRAFT,SUBMITTED,APPROVED', label: 'Upcoming' },
+          { value: 'DRAFT', label: 'Drafts' },
+          { value: 'SUBMITTED', label: 'Waiting for IT' },
+          { value: 'APPROVED', label: 'Approved' },
+          { value: 'COMPLETED', label: 'Joined' },
+          { value: 'CANCELLED', label: 'Cancelled' },
+        ]}
+        empty={<EmptyState icon={UserPlus} title="No one joining soon" description="Add a new joiner to get their things ready before day 1." action={newJoiner || undefined} />}
+      />
     </div>
   );
 }

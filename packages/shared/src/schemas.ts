@@ -424,6 +424,12 @@ export const onboardingItemUpdateSchema = z.object({
 export const onboardingUpdateSchema = z.object({ joinDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), notes: optText(2000) });
 export const onboardingIssueSchema = z.object({ assetId: optId, notes: optText(500) });
 export const onboardingCancelSchema = z.object({ reason: z.string().trim().min(3, 'Give a short reason').max(500) });
+export const onboardingReturnSchema = z.object({ note: z.string().trim().min(3, 'Tell HR what to change').max(1000) });
+/** IT assigns every remaining item in one go: which asset goes for which item. */
+export const onboardingAssignAllSchema = z.object({
+  assignments: z.array(z.object({ itemId: reqId, assetId: reqId })).min(1, 'Pick at least one asset').max(50),
+});
+export type OnboardingAssignAllInput = z.infer<typeof onboardingAssignAllSchema>;
 export const onboardingKitSchema = z.object({
   name: reqText(120),
   items: z.array(onboardingItemSchema).min(1, 'Add at least one item').max(50),

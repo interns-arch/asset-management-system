@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, ilike, inArray, or, sql, type SQL } from 'drizzle-orm';
 import {
   ONBOARDING_STATUSES,
+  type OnboardingAssignAllInput,
   type OnboardingCreateInput,
   type OnboardingIssueInput,
   type OnboardingItemInput,
@@ -32,7 +33,7 @@ import { AuthService } from '../auth/auth.service';
 import { EmployeesService } from '../employees/employees.service';
 
 type CaseRow = typeof onboardingCases.$inferSelect;
-const OPEN = ['DRAFT', 'SUBMITTED'] as const;
+const OPEN = ['DRAFT', 'SUBMITTED', 'APPROVED'] as const;
 const READY_ASSET_STATUSES = ['AVAILABLE', 'IN_INVENTORY'];
 
 const itemCounts = {
@@ -71,6 +72,11 @@ export class OnboardingService {
 
   private assertOpen(c: CaseRow) {
     if (!(OPEN as readonly string[]).includes(c.status)) throw conflict(`This onboarding is already ${c.status === 'COMPLETED' ? 'completed' : 'cancelled'}.`);
+  }
+
+  /** HR can change the plan until IT approves it; after that only IT can. */
+  private assertCanEditPlan(actor: Actor, c: CaseRow) {
+    if (c.status === 'APPROVED' && !can(actor, 'asset:assign')) throw conflict('IT has already approved this plan — ask IT to change it.');
   }
 
   private async employeeName(id: string) {
@@ -197,7 +203,7 @@ export class OnboardingService {
       login: row.login?.id ? row.login : null,
       items: list,
       counts,
-      ready: counts.total > 0 && counts.planned === 0 && !list.some((i) => i.preparedUnavailable),
+      ready: counts.total > 0 && counts.planned + counts.prepared === 0,
     };
   }
 
@@ -270,6 +276,7 @@ export class OnboardingService {
     return this.dbs.tx(async () => {
       const c = await this.lockCase(id);
       this.assertOpen(c);
+      this.assertCanEditPlan(actor, c);
       const added = await this.insertItems(id, items);
       await this.history.record(actor, {
         entityType: 'ONBOARDING_CASE',
@@ -289,15 +296,62 @@ export class OnboardingService {
       const c = await this.lockCase(id);
       if (c.status !== 'DRAFT') throw conflict('This onboarding has already been sent to IT.');
       const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(onboardingItems).where(eq(onboardingItems.caseId, id));
-      if (!n) throw badRequest('Add at least one item for IT to prepare.');
-      await db.update(onboardingCases).set({ status: 'SUBMITTED', submittedAt: new Date(), submittedByName: actor.name, updatedAt: new Date() }).where(eq(onboardingCases.id, id));
+      if (!n) throw badRequest('Add at least one item they need.');
+      await db
+        .update(onboardingCases)
+        .set({ status: 'SUBMITTED', submittedAt: new Date(), submittedByName: actor.name, returnNote: null, updatedAt: new Date() })
+        .where(eq(onboardingCases.id, id));
       const who = await this.employeeName(c.employeeId);
-      await this.history.record(actor, { entityType: 'ONBOARDING_CASE', entityId: id, entityLabel: c.caseNumber, action: 'SUBMITTED', summary: `Sent to IT to prepare ${n} item${n > 1 ? 's' : ''}`, employeeId: c.employeeId });
+      await this.history.record(actor, {
+        entityType: 'ONBOARDING_CASE',
+        entityId: id,
+        entityLabel: c.caseNumber,
+        action: 'SUBMITTED',
+        summary: `Sent to IT for approval — ${n} item${n > 1 ? 's' : ''}`,
+        employeeId: c.employeeId,
+      });
       await this.notifications.notifyPermission(
         'asset:assign',
-        { type: 'ONBOARDING_SUBMITTED', title: `New joiner: ${who}`, body: `Joins ${c.joinDate} — ${n} item${n > 1 ? 's' : ''} to prepare (${c.caseNumber})`, link: `/onboarding/${id}` },
+        { type: 'ONBOARDING_SUBMITTED', title: `New joiner to approve: ${who}`, body: `Joins ${c.joinDate} — ${n} item${n > 1 ? 's' : ''} requested (${c.caseNumber})`, link: `/onboarding/${id}` },
         actor.userId,
       );
+      return { ok: true };
+    });
+  }
+
+  /** IT accepts HR's list; assigning can start. */
+  async approve(actor: Actor, id: string) {
+    assertCan(actor, 'asset:assign');
+    return this.dbs.tx(async (db) => {
+      const c = await this.lockCase(id);
+      if (c.status !== 'SUBMITTED') throw conflict(c.status === 'DRAFT' ? 'HR has not sent this yet.' : 'This onboarding is not waiting for approval.');
+      await db.update(onboardingCases).set({ status: 'APPROVED', approvedAt: new Date(), approvedByName: actor.name, updatedAt: new Date() }).where(eq(onboardingCases.id, id));
+      const who = await this.employeeName(c.employeeId);
+      await this.history.record(actor, { entityType: 'ONBOARDING_CASE', entityId: id, entityLabel: c.caseNumber, action: 'APPROVED', summary: 'Approved by IT', employeeId: c.employeeId });
+      if (c.createdBy) {
+        await this.notifications.notifyUsers([c.createdBy], { type: 'ONBOARDING_APPROVED', title: `IT approved ${who}`, body: `${c.caseNumber} — IT is getting everything ready for ${c.joinDate}`, link: `/onboarding/${id}` });
+      }
+      return { ok: true };
+    });
+  }
+
+  /** IT sends the plan back to HR with a note (e.g. a wrong item); HR edits and sends again. */
+  async sendBack(actor: Actor, id: string, note: string) {
+    assertCan(actor, 'asset:assign');
+    return this.dbs.tx(async (db) => {
+      const c = await this.lockCase(id);
+      if (c.status !== 'SUBMITTED' && c.status !== 'APPROVED') throw conflict('Only a plan sent to IT can be sent back.');
+      const [{ issued }] = await db
+        .select({ issued: sql<number>`count(*)::int` })
+        .from(onboardingItems)
+        .where(and(eq(onboardingItems.caseId, id), eq(onboardingItems.status, 'ISSUED')));
+      if (issued) throw conflict('Some items are already assigned — change the remaining items here instead.');
+      await db.update(onboardingCases).set({ status: 'DRAFT', returnNote: note, approvedAt: null, approvedByName: null, updatedAt: new Date() }).where(eq(onboardingCases.id, id));
+      const who = await this.employeeName(c.employeeId);
+      await this.history.record(actor, { entityType: 'ONBOARDING_CASE', entityId: id, entityLabel: c.caseNumber, action: 'RETURNED', summary: `Sent back to HR: ${note}`, employeeId: c.employeeId });
+      if (c.createdBy) {
+        await this.notifications.notifyUsers([c.createdBy], { type: 'ONBOARDING_RETURNED', title: `IT sent back ${who}`, body: note, link: `/onboarding/${id}` });
+      }
       return { ok: true };
     });
   }
@@ -357,9 +411,10 @@ export class OnboardingService {
     return this.dbs.tx(async (db) => {
       const c = await this.lockCase(id);
       this.assertOpen(c);
+      this.assertCanEditPlan(actor, c);
       const [item] = await db.select().from(onboardingItems).where(and(eq(onboardingItems.id, itemId), eq(onboardingItems.caseId, id)));
       if (!item) throw notFound('Item');
-      if (item.status === 'ISSUED') throw conflict('An issued item cannot be removed — return the asset instead.');
+      if (item.status === 'ISSUED') throw conflict('An assigned item cannot be removed — return the asset instead.');
       await db.delete(onboardingItems).where(eq(onboardingItems.id, itemId));
       await this.history.record(actor, { entityType: 'ONBOARDING_CASE', entityId: id, entityLabel: c.caseNumber, action: 'ITEM_REMOVED', summary: `${item.itemName} removed from the plan`, employeeId: c.employeeId });
       return { ok: true };
@@ -371,6 +426,7 @@ export class OnboardingService {
     return this.dbs.tx(async (db) => {
       const c = await this.lockCase(id);
       this.assertOpen(c);
+      if (c.status !== 'APPROVED') throw conflict('Approve the plan first, then assign.');
       const [item] = await db.select().from(onboardingItems).where(and(eq(onboardingItems.id, itemId), eq(onboardingItems.caseId, id))).for('update');
       if (!item) throw notFound('Item');
       if (item.status === 'ISSUED') throw conflict('This item has already been issued.');
@@ -404,25 +460,25 @@ export class OnboardingService {
     });
   }
 
-  /** Issues every prepared item; each one on its own so a single failure does not block the rest. */
-  async issuePrepared(actor: Actor, id: string) {
+  /** Assigns each chosen asset to its item; each one on its own so a single failure does not block the rest. */
+  async assignAll(actor: Actor, id: string, input: OnboardingAssignAllInput) {
     assertCan(actor, 'asset:assign');
-    const prepared = await this.dbs.db
-      .select({ id: onboardingItems.id, itemName: onboardingItems.itemName })
-      .from(onboardingItems)
-      .where(and(eq(onboardingItems.caseId, id), eq(onboardingItems.status, 'PREPARED')));
-    const results: { itemId: string; itemName: string; ok: boolean; error?: string }[] = [];
-    for (const p of prepared) {
+    const names = new Map(
+      (await this.dbs.db.select({ id: onboardingItems.id, itemName: onboardingItems.itemName }).from(onboardingItems).where(eq(onboardingItems.caseId, id))).map((i) => [i.id, i.itemName]),
+    );
+    const results: { itemId: string; itemName: string; ok: boolean; allocationId?: string; assetId?: string; error?: string }[] = [];
+    for (const a of input.assignments) {
+      const itemName = names.get(a.itemId) ?? 'Item';
       try {
-        await this.issueItem(actor, id, p.id, {});
-        results.push({ itemId: p.id, itemName: p.itemName, ok: true });
+        const r = await this.issueItem(actor, id, a.itemId, { assetId: a.assetId });
+        results.push({ itemId: a.itemId, itemName, ok: true, allocationId: r.allocationId, assetId: r.assetId });
       } catch (err) {
         const res = (err as { getResponse?: () => unknown }).getResponse?.();
         const message = typeof res === 'object' && res && 'message' in res ? String((res as { message: unknown }).message) : (err as Error).message;
-        results.push({ itemId: p.id, itemName: p.itemName, ok: false, error: message });
+        results.push({ itemId: a.itemId, itemName, ok: false, error: message });
       }
     }
-    return { results, issued: results.filter((r) => r.ok).length };
+    return { results, assigned: results.filter((r) => r.ok).length };
   }
 
   // ─── Day 1 and after ─────────────────────────────────────────────────────
@@ -432,6 +488,7 @@ export class OnboardingService {
     return this.dbs.tx(async (db) => {
       const c = await this.lockCase(id);
       this.assertOpen(c);
+      if (c.status !== 'APPROVED') throw conflict('IT has to approve the plan before the joiner can be marked as joined.');
       const leftovers = await db
         .select()
         .from(onboardingItems)
@@ -552,23 +609,5 @@ export class OnboardingService {
     const [gone] = await this.dbs.db.delete(onboardingKits).where(eq(onboardingKits.id, id)).returning({ id: onboardingKits.id });
     if (!gone) throw notFound('Kit');
     return { ok: true };
-  }
-
-  /** Open cases that IT still has to prepare, for the priority queue. */
-  async queueItems(actor: Actor) {
-    if (!can(actor, 'asset:assign')) return [];
-    return this.dbs.db
-      .select({
-        id: onboardingCases.id,
-        caseNumber: onboardingCases.caseNumber,
-        joinDate: onboardingCases.joinDate,
-        createdAt: onboardingCases.submittedAt,
-        employeeName: employees.fullName,
-        designation: employees.designation,
-        ...itemCounts,
-      })
-      .from(onboardingCases)
-      .innerJoin(employees, eq(employees.id, onboardingCases.employeeId))
-      .where(and(eq(onboardingCases.status, 'SUBMITTED'), sql`exists (select 1 from onboarding_items i where i.case_id = onboarding_cases.id and i.status in ('PLANNED', 'PREPARED'))`));
   }
 }

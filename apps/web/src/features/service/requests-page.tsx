@@ -1,6 +1,7 @@
 import { humanize, PRIORITIES } from '@eam/shared';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Check, ClipboardList, PackageCheck, Plus, Search, X } from 'lucide-react';
+import { Check, ClipboardList, PackageCheck, Plus, Search, UserPlus, X } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { EnumBadge } from '@/components/common/badges';
@@ -14,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Input, NativeSelect } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/overlays';
 import { Card } from '@/components/ui/primitives';
+import { OnboardingTable } from '@/features/onboarding/onboarding-page';
 import { useQuickAdd } from '@/features/quick-add/quick-add';
 import { api, errorMessage, type Page } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -33,6 +35,53 @@ const TABS = [
 ];
 
 export default function RequestsPage() {
+  const { can } = useAuth();
+  const [params] = useSearchParams();
+  const joiners = can('asset:assign') && params.get('view') === 'joiners';
+  const waiting = useQuery({
+    queryKey: ['onboarding', 'waiting-count'],
+    queryFn: () => api.get<Page<unknown>>('/onboarding', { status: 'SUBMITTED', pageSize: 1 }),
+    enabled: can('asset:assign'),
+  });
+  const switcher = can('asset:assign') && (
+    <div className="mb-4 flex gap-0.5 rounded-lg bg-muted p-0.5 sm:w-fit">
+      {[
+        { to: '/requests', label: 'Asset requests', active: !joiners, count: 0 },
+        { to: '/requests?view=joiners', label: 'New joiners', active: joiners, count: waiting.data?.total ?? 0 },
+      ].map((v) => (
+        <Link
+          key={v.to}
+          to={v.to}
+          className={cn('flex-1 rounded-md px-3 py-1.5 text-center text-[13px] font-medium transition sm:flex-none', v.active ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}
+        >
+          {v.label}
+          {v.count > 0 && <span className="ml-1.5 rounded-full bg-primary px-1.5 py-0.5 text-[11px] font-semibold text-primary-foreground">{v.count}</span>}
+        </Link>
+      ))}
+    </div>
+  );
+  if (joiners) {
+    return (
+      <div>
+        <PageHeader title="Requests" description="New joiners from HR: approve what they need, then assign it all before their first day." />
+        {switcher}
+        <OnboardingTable
+          defaultStatus="SUBMITTED,APPROVED"
+          tabs={[
+            { value: 'SUBMITTED,APPROVED', label: 'Open' },
+            { value: 'SUBMITTED', label: 'To approve' },
+            { value: 'APPROVED', label: 'To assign' },
+            { value: 'COMPLETED', label: 'Joined' },
+          ]}
+          empty={<EmptyState icon={UserPlus} title="No new joiners waiting" description="When HR sends a new joiner, it appears here for approval." />}
+        />
+      </div>
+    );
+  }
+  return <AssetRequests switcher={switcher} />;
+}
+
+function AssetRequests({ switcher }: { switcher: React.ReactNode }) {
   const { can, me } = useAuth();
   const quickAdd = useQuickAdd();
   const confirm = useConfirm();
@@ -146,6 +195,7 @@ export default function RequestsPage() {
           )
         }
       />
+      {switcher}
       <div className="mb-3 flex gap-1 overflow-x-auto pb-1 no-scrollbar">
         {TABS.map((t) => (
           <button

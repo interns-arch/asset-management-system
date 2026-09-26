@@ -57,7 +57,6 @@ export const SYSTEM_ROLES: RoleTemplate[] = [
     name: 'HR',
     description: 'Manages employees, notice periods and exits',
     permissions: [
-      'dashboard:view',
       'asset:view',
       'employee:view',
       'employee:manage',

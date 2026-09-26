@@ -30,7 +30,7 @@ export class LeadershipService {
           (select count(*)::int from employees where status in ('ACTIVE', 'ON_LEAVE', 'NOTICE_PERIOD')) as headcount,
           (select count(*)::int from employees where status <> 'JOINING' and join_date >= (${since})::date) as joiners,
           (select count(*)::int from exit_cases where status = 'COMPLETED' and completed_at >= ${since}) as leavers,
-          (select count(*)::int from onboarding_cases where status in ('DRAFT', 'SUBMITTED')) as upcoming_joiners,
+          (select count(*)::int from onboarding_cases where status in ('DRAFT', 'SUBMITTED', 'APPROVED')) as upcoming_joiners,
           (select count(*)::int from employees where status = 'NOTICE_PERIOD') as on_notice,
           (select count(*)::int from assets where status = 'ASSIGNED') as assets_in_use,
           (select count(*)::int from assets where status = 'AVAILABLE') as assets_available`),

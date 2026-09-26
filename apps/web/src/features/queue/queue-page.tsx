@@ -21,7 +21,8 @@ const TILE: Record<Priority, string> = {
   MEDIUM: 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300',
   LOW: 'border-zinc-200 bg-zinc-50 text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800/40 dark:text-zinc-300',
 };
-const STATUS_TEXT: Record<string, string> = { OPEN: 'Open', IN_PROGRESS: 'In progress', PENDING: 'Needs approval', APPROVED: 'Ready to fulfil', SUBMITTED: 'Prepare before joining' };
+const STATUS_TEXT: Record<string, string> = { OPEN: 'Open', IN_PROGRESS: 'In progress', PENDING: 'Needs approval', APPROVED: 'Ready to fulfil' };
+const JOINER_TEXT: Record<string, string> = { SUBMITTED: 'Approve items', APPROVED: 'Assign items' };
 const KINDS = [
   { value: '', label: 'Everything' },
   { value: 'TICKET', label: 'Tickets' },
@@ -143,7 +144,7 @@ function QueueRow({ item, compact }: { item: QueueItem; compact?: boolean }) {
       <div className="min-w-0 flex-1">
         <div className="truncate font-medium">{item.title}</div>
         <div className="truncate text-xs text-muted-foreground">
-          <span className="font-mono">{item.number}</span> · {STATUS_TEXT[item.status] ?? item.status}
+          <span className="font-mono">{item.number}</span> · {(item.kind === 'ONBOARDING' ? JOINER_TEXT : STATUS_TEXT)[item.status] ?? item.status}
           {item.detail ? ` · ${item.detail}` : ''}
           {!compact && item.assigneeName ? ` · ${item.assigneeName}` : ''}
         </div>

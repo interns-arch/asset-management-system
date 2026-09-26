@@ -483,27 +483,38 @@ describe('onboarding', () => {
     assert.equal(ob.body.status, 'DRAFT');
     assert.deepEqual(ob.body.items.map((i: { itemName: string }) => i.itemName), ['Quadcopter', 'Safety vest', 'Welcome kit']);
 
-    // Sending to IT notifies them and puts the joiner in their priority queue.
+    // HR sends it to IT: IT is notified and sees it in the priority queue, waiting for approval.
     assert.equal((await call('POST', `/onboarding/${caseId}/submit`)).status, 200);
     const notes = await call('GET', '/notifications', undefined, 'it');
-    assert.ok(JSON.stringify(notes.body).includes('New joiner: Joiner One'));
+    assert.ok(JSON.stringify(notes.body).includes('New joiner to approve: Joiner One'));
     const queue = await call('GET', '/queue?kind=ONBOARDING', undefined, 'it');
-    assert.ok(queue.body.items.some((i: { id: string }) => i.id === caseId));
+    assert.equal(queue.body.items.find((i: { id: string }) => i.id === caseId).status, 'SUBMITTED');
 
-    // IT sets a drone aside (a note, not a reservation), skips the vest, and issues what is prepared.
-    const drone = await newDrone({ name: 'Joiner drone' });
+    // Nothing can be assigned before approval; IT can send it back to HR with a note.
     const [droneItem, vest] = ob.body.items;
+    const drone = await newDrone({ name: 'Joiner drone' });
+    assert.equal((await call('POST', `/onboarding/${caseId}/assign-all`, { assignments: [{ itemId: droneItem.id, assetId: drone.body.id }] }, 'it')).body.assigned, 0);
+    assert.equal((await call('POST', `/onboarding/${caseId}/send-back`, { note: 'Add a charger too' }, 'it')).status, 200);
+    ob = await call('GET', `/onboarding/${caseId}`, undefined, 'it');
+    assert.equal(ob.body.status, 'DRAFT');
+    assert.equal(ob.body.returnNote, 'Add a charger too');
+    assert.equal((await call('POST', `/onboarding/${caseId}/submit`)).status, 200);
+
+    // IT approves, skips the vest and assigns the drone in one go.
+    assert.equal((await call('POST', `/onboarding/${caseId}/approve`, {}, 'it')).status, 200);
+    assert.equal((await call('PATCH', `/onboarding/${caseId}/items/${vest.id}`, { status: 'SKIPPED', skipReason: 'Not needed for office role' }, 'it')).status, 200);
     const taken = await newDrone({ name: 'Already out' });
     await call('POST', `/assets/${taken.body.id}/assign`, { holderType: 'EMPLOYEE', holderId: ids.alice });
-    assert.equal((await call('PATCH', `/onboarding/${caseId}/items/${droneItem.id}`, { status: 'PREPARED', preparedAssetId: taken.body.id }, 'it')).status, 400, 'an asset someone holds cannot be set aside');
-    assert.equal((await call('PATCH', `/onboarding/${caseId}/items/${droneItem.id}`, { status: 'PREPARED', preparedAssetId: drone.body.id }, 'it')).status, 200);
-    assert.equal((await call('PATCH', `/onboarding/${caseId}/items/${vest.id}`, { status: 'SKIPPED', skipReason: 'Not needed for office role' }, 'it')).status, 200);
+    const assigned = await call('POST', `/onboarding/${caseId}/assign-all`, { assignments: [{ itemId: droneItem.id, assetId: drone.body.id }] }, 'it');
+    assert.equal(assigned.body.assigned, 1);
     ob = await call('GET', `/onboarding/${caseId}`, undefined, 'it');
-    assert.equal(ob.body.ready, false, 'the welcome kit is still to prepare');
-    const issued = await call('POST', `/onboarding/${caseId}/issue-prepared`, {}, 'it');
-    assert.equal(issued.body.issued, 1);
+    assert.equal(ob.body.ready, false, 'the welcome kit is still to assign');
     emp = await call('GET', `/employees/${employeeId}`);
     assert.ok(emp.body.assets.some((a: { assetId: string }) => a.assetId === drone.body.id));
+    // An asset someone else holds cannot be assigned.
+    const welcome = ob.body.items.find((i: { itemName: string }) => i.itemName === 'Welcome kit');
+    const clash = await call('POST', `/onboarding/${caseId}/assign-all`, { assignments: [{ itemId: welcome.id, assetId: taken.body.id }] }, 'it');
+    assert.equal(clash.body.assigned, 0);
 
     // Joining day: employee becomes active, the un-given welcome kit becomes an approved request.
     const done = await call('POST', `/onboarding/${caseId}/complete`, {}, 'it');

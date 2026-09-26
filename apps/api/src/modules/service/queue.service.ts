@@ -75,7 +75,8 @@ export class QueueService {
             })
             .from(onboardingCases)
             .innerJoin(employees, eq(employees.id, onboardingCases.employeeId))
-            .where(sql`${onboardingCases.status} = 'SUBMITTED' and exists (select 1 from onboarding_items i where i.case_id = onboarding_cases.id and i.status in ('PLANNED', 'PREPARED'))`)
+            // Waiting for approval, or approved with items still to assign.
+            .where(sql`${onboardingCases.status} = 'SUBMITTED' or (${onboardingCases.status} = 'APPROVED' and exists (select 1 from onboarding_items i where i.case_id = onboarding_cases.id and i.status in ('PLANNED', 'PREPARED')))`)
             .limit(QUEUE_LIMIT)
         : [],
     ]);
@@ -118,9 +119,9 @@ export class QueueService {
         id: c.id,
         number: c.caseNumber,
         title: `New joiner: ${employeeName}`,
-        detail: `${toPrepare} item${toPrepare > 1 ? 's' : ''} to give${designation ? ` · ${designation}` : ''}`,
+        detail: `${toPrepare} item${toPrepare === 1 ? '' : 's'} ${c.status === 'SUBMITTED' ? 'requested' : 'to assign'}${designation ? ` · ${designation}` : ''}`,
         priority: d <= 1 ? 'URGENT' : d <= 3 ? 'HIGH' : d <= 7 ? 'MEDIUM' : 'LOW',
-        status: 'SUBMITTED',
+        status: c.status,
         createdAt: c.submittedAt ?? c.createdAt,
         dueDate: c.joinDate,
         overdue: c.joinDate < now,

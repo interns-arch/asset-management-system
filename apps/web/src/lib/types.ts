@@ -537,6 +537,9 @@ export interface OnboardingDetail {
   completedByName: string | null;
   cancelledAt: string | null;
   cancelReason: string | null;
+  returnNote: string | null;
+  approvedAt: string | null;
+  approvedByName: string | null;
   employee: { id: string; employeeCode: string; fullName: string; designation: string | null; email: string | null; phone: string | null; status: EmployeeStatus; departmentName: string | null; locationName: string | null };
   login: { id: string; isActive: boolean } | null;
   items: OnboardingItem[];

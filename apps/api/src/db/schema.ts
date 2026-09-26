@@ -648,11 +648,15 @@ export const onboardingCases = pgTable(
     completedByName: text('completed_by_name'),
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
     cancelReason: text('cancel_reason'),
+    /** Set when IT sends the plan back to HR; cleared when HR resends it. */
+    returnNote: text('return_note'),
+    approvedAt: timestamp('approved_at', { withTimezone: true }),
+    approvedByName: text('approved_by_name'),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
-    uniqueIndex('onboarding_one_open_uq').on(t.employeeId).where(sql`status in ('DRAFT', 'SUBMITTED')`),
+    uniqueIndex('onboarding_one_open_uq').on(t.employeeId).where(sql`status in ('DRAFT', 'SUBMITTED', 'APPROVED')`),
     index('onboarding_status_idx').on(t.status, t.joinDate),
   ],
 );

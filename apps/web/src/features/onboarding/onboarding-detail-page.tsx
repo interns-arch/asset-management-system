@@ -1,6 +1,6 @@
 import { ONBOARDING_STATUS_LABELS } from '@eam/shared';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { AlertTriangle, ArrowLeft, CalendarDays, CheckCircle2, Circle, Gift, IdCard, KeyRound, MoreHorizontal, PackageCheck, Plus, Save, Send, Trash2, Undo2, UserCheck, X } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Check as CheckIcon, CheckCircle2, Circle, Clock, Gift, IdCard, KeyRound, MessageSquareWarning, MoreHorizontal, PackageCheck, Plus, Save, Send, Trash2, Undo2, UserCheck, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { toast } from 'sonner';
@@ -24,14 +24,18 @@ import type { HistoryEvent, OnboardingDetail, OnboardingItem, OnboardingKit } fr
 import { cn, formatDate, formatDateTime } from '@/lib/utils';
 import { JoinsIn } from './onboarding-page';
 
+/**
+ * One new joiner. HR lists what they need and sends it to IT; IT approves (or sends it back),
+ * assigns everything, and either side marks them as joined on day 1.
+ */
 export default function OnboardingDetailPage() {
   const { id } = useParams();
   const { can } = useAuth();
   const confirm = useConfirm();
   const manage = can('onboarding:manage');
   const it = can('asset:assign');
-  const [pickFor, setPickFor] = useState<OnboardingItem | null>(null);
   const [issueFor, setIssueFor] = useState<OnboardingItem | null>(null);
+  const [assignAll, setAssignAll] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
   const q = useQuery({ queryKey: ['onboarding-case', id], queryFn: () => api.get<OnboardingDetail>(`/onboarding/${id}`) });
   const history = useQuery({ queryKey: ['history', 'onboarding', id], queryFn: () => api.get<Page<HistoryEvent>>(`/onboarding/${id}/history`), enabled: !!q.data });
@@ -53,29 +57,30 @@ export default function OnboardingDetailPage() {
   if (q.isLoading) return <PageLoader />;
   if (q.error || !q.data) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
   const o = q.data;
-  const open = o.status === 'DRAFT' || o.status === 'SUBMITTED';
-  const done = o.counts.prepared + o.counts.issued + o.counts.skipped;
-  const leftovers = o.counts.planned + o.counts.prepared;
+  const open = o.status === 'DRAFT' || o.status === 'SUBMITTED' || o.status === 'APPROVED';
+  const approved = o.status === 'APPROVED';
+  const toAssign = o.items.filter((i) => i.status === 'PLANNED' || i.status === 'PREPARED');
+  const done = o.counts.issued + o.counts.skipped;
+  // HR can change the list until IT approves it; IT can change it any time before joining.
+  const canEditPlan = open && (it || (manage && !approved));
+  const first = o.employee.fullName.split(' ')[0];
 
-  const send = () => act.mutate({ path: '/submit' }, { onSuccess: () => toast.success('Sent to IT', { description: 'They’ve been notified to prepare everything.' }) });
-  const issueAll = () =>
-    act.mutate(
-      { path: '/issue-prepared' },
-      {
-        onSuccess: async (r) => {
-          const res = r as { issued: number; results: { ok: boolean; itemName: string; error?: string }[] };
-          await invalidateAssetData();
-          if (res.issued) toast.success(`${res.issued} item${res.issued > 1 ? 's' : ''} handed over to ${o.employee.fullName}`);
-          const failed = res.results.filter((x) => !x.ok);
-          if (failed.length) toast.error(`${failed.length} could not be issued`, { description: failed.map((f) => `${f.itemName}: ${f.error}`).join('\n') });
-        },
-      },
-    );
+  const send = () => act.mutate({ path: '/submit' }, { onSuccess: () => toast.success('Sent to IT', { description: 'IT has been notified to approve it.' }) });
+  const approve = () => act.mutate({ path: '/approve' }, { onSuccess: () => toast.success('Approved', { description: 'Now assign the items.' }) });
+  const sendBack = async () => {
+    const r = await confirm({
+      title: 'Send back to HR?',
+      description: 'HR gets your note, changes the list and sends it again.',
+      confirmText: 'Send back',
+      note: { label: 'What should HR change?', required: true, minLength: 3, placeholder: 'No monitors in stock — remove it, or add a charger' },
+    });
+    if (r.confirmed) act.mutate({ path: '/send-back', body: { note: r.note } }, { onSuccess: () => toast.success('Sent back to HR') });
+  };
   const markJoined = async () => {
     const res = await confirm({
       title: `Mark ${o.employee.fullName} as joined?`,
-      description: leftovers
-        ? `${leftovers} item${leftovers > 1 ? 's have' : ' has'} not been given yet — ${leftovers > 1 ? 'they' : 'it'} will be added to Requests (approved) so IT can still give ${leftovers > 1 ? 'them' : 'it'}.`
+      description: toAssign.length
+        ? `${toAssign.length} item${toAssign.length > 1 ? 's have' : ' has'} not been assigned yet — ${toAssign.length > 1 ? 'they' : 'it'} will stay in Requests (approved) so IT can still give ${toAssign.length > 1 ? 'them' : 'it'}.`
         : 'Their status becomes Active.',
       confirmText: 'Mark joined',
     });
@@ -86,7 +91,7 @@ export default function OnboardingDetailPage() {
           onSuccess: async (r) => {
             await invalidateAssetData();
             const reqs = (r as { requests: string[] }).requests;
-            toast.success(`${o.employee.fullName} has joined`, { description: reqs.length ? `Added to requests: ${reqs.join(', ')}` : undefined });
+            toast.success(`${o.employee.fullName} has joined`, { description: reqs.length ? `Still to give, in Requests: ${reqs.join(', ')}` : undefined });
           },
         },
       );
@@ -103,7 +108,7 @@ export default function OnboardingDetailPage() {
   };
   const saveKit = async () => {
     const res = await confirm({
-      title: 'Save these items as a kit?',
+      title: 'Save this list as a kit?',
       description: 'Next time, pick this kit when adding a joiner for the same role. An existing kit with the same name is updated.',
       confirmText: 'Save kit',
       note: { label: 'Kit name', required: true, minLength: 2, placeholder: o.employee.designation ?? 'Field Sales Executive' },
@@ -124,8 +129,8 @@ export default function OnboardingDetailPage() {
   return (
     <div className="space-y-5">
       <Button variant="ghost" size="xs" asChild>
-        <Link to="/onboarding">
-          <ArrowLeft /> Onboarding
+        <Link to={it ? '/requests?view=joiners' : '/onboarding'}>
+          <ArrowLeft /> {it ? 'New joiner requests' : 'New joiners'}
         </Link>
       </Button>
 
@@ -138,7 +143,7 @@ export default function OnboardingDetailPage() {
                 {o.employee.fullName}
               </Link>
               <EnumBadge value={o.status} tones={ONBOARDING_TONE} labels={ONBOARDING_STATUS_LABELS} />
-              {open && o.ready && (
+              {approved && o.ready && (
                 <Badge tone="green">
                   <CheckCircle2 /> Ready for day 1
                 </Badge>
@@ -148,7 +153,6 @@ export default function OnboardingDetailPage() {
               <span className="font-mono">{o.employee.employeeCode}</span>
               {o.employee.designation ? ` · ${o.employee.designation}` : ''}
               {o.employee.departmentName ? ` · ${o.employee.departmentName}` : ''}
-              {o.employee.locationName ? ` · ${o.employee.locationName}` : ''}
             </p>
             <p className="mt-1 flex flex-wrap items-center gap-x-2 text-sm">
               <CalendarDays className="size-4 text-muted-foreground" /> Joining {formatDate(o.joinDate)}
@@ -163,15 +167,27 @@ export default function OnboardingDetailPage() {
                   <Send /> Send to IT
                 </Button>
               )}
-              {it && o.counts.prepared > 0 && (
-                <Button variant={o.status === 'DRAFT' ? 'outline' : 'default'} onClick={issueAll} loading={act.isPending}>
-                  <PackageCheck /> Hand over {o.counts.prepared} prepared
+              {o.status === 'SUBMITTED' && it && (
+                <>
+                  <Button onClick={approve} loading={act.isPending}>
+                    <CheckIcon /> Approve
+                  </Button>
+                  <Button variant="outline" onClick={sendBack} disabled={act.isPending}>
+                    <Undo2 /> Send back to HR
+                  </Button>
+                </>
+              )}
+              {approved && it && toAssign.length > 0 && (
+                <Button onClick={() => setAssignAll(true)}>
+                  <PackageCheck /> Assign all ({toAssign.length})
                 </Button>
               )}
-              <Button variant="outline" onClick={markJoined} disabled={act.isPending}>
-                <UserCheck /> Mark joined
-              </Button>
-              {manage && (
+              {approved && (
+                <Button variant={toAssign.length ? 'outline' : 'default'} onClick={markJoined} disabled={act.isPending}>
+                  <UserCheck /> Mark joined
+                </Button>
+              )}
+              {(manage || it) && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" aria-label="More">
@@ -179,28 +195,49 @@ export default function OnboardingDetailPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onSelect={() => setDateOpen(true)}>
-                      <CalendarDays /> Change joining date
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => void saveKit()} disabled={!o.items.length}>
-                      <Save /> Save items as a kit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem destructive onSelect={() => void cancel()}>
-                      <X /> Not joining — cancel
-                    </DropdownMenuItem>
+                    {manage && (
+                      <DropdownMenuItem onSelect={() => setDateOpen(true)}>
+                        <CalendarDays /> Change joining date
+                      </DropdownMenuItem>
+                    )}
+                    {approved && it && o.counts.issued === 0 && (
+                      <DropdownMenuItem onSelect={() => void sendBack()}>
+                        <Undo2 /> Send back to HR
+                      </DropdownMenuItem>
+                    )}
+                    {manage && (
+                      <DropdownMenuItem onSelect={() => void saveKit()} disabled={!o.items.length}>
+                        <Save /> Save list as a kit
+                      </DropdownMenuItem>
+                    )}
+                    {manage && (
+                      <DropdownMenuItem destructive onSelect={() => void cancel()}>
+                        <X /> Not joining — cancel
+                      </DropdownMenuItem>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
             </div>
           )}
         </CardContent>
-        {o.items.length > 0 && (
+        {o.status === 'DRAFT' && o.returnNote && (
+          <div className="flex items-start gap-2 border-t bg-amber-50 px-5 py-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+            <MessageSquareWarning className="mt-0.5 size-4 shrink-0" />
+            <span>
+              <span className="font-medium">IT sent this back:</span> {o.returnNote}
+            </span>
+          </div>
+        )}
+        {o.status === 'SUBMITTED' && !it && (
+          <div className="flex items-center gap-2 border-t bg-muted/40 px-5 py-3 text-sm text-muted-foreground">
+            <Clock className="size-4 shrink-0" /> Waiting for IT to approve. You can still change the list until then.
+          </div>
+        )}
+        {o.items.length > 0 && approved && (
           <div className="border-t px-5 py-3">
-            <div className="mb-1.5 flex justify-between text-xs text-muted-foreground">
-              <span>
-                {done} of {o.counts.total} ready · {o.counts.issued} handed over
-              </span>
-              {o.status === 'DRAFT' && <span>HR is still planning — send to IT when the list is complete</span>}
+            <div className="mb-1.5 text-xs text-muted-foreground">
+              {o.counts.issued} of {o.counts.total - o.counts.skipped} assigned{o.approvedByName ? ` · approved by ${o.approvedByName}` : ''}
             </div>
             <Progress value={(done / o.counts.total) * 100} indicatorClassName={done === o.counts.total ? 'bg-emerald-500' : undefined} />
           </div>
@@ -210,8 +247,8 @@ export default function OnboardingDetailPage() {
       <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
         <Card className="overflow-hidden">
           <CardHeader>
-            <CardTitle>What {o.employee.fullName.split(' ')[0]} gets</CardTitle>
-            {open && manage && <ApplyKit caseId={o.id} onDone={refresh} />}
+            <CardTitle>What {first} needs</CardTitle>
+            {canEditPlan && manage && <ApplyKit caseId={o.id} onDone={refresh} />}
           </CardHeader>
           {o.items.length ? (
             <ul className="divide-y border-t">
@@ -219,11 +256,9 @@ export default function OnboardingDetailPage() {
                 <ItemRow
                   key={item.id}
                   item={item}
-                  open={open}
-                  it={it}
-                  canEdit={manage || it}
+                  canAssign={approved && it}
+                  canRemove={canEditPlan}
                   busy={act.isPending}
-                  onPick={() => setPickFor(item)}
                   onIssue={() => setIssueFor(item)}
                   onSkip={async () => {
                     const r = await confirm({ title: `Skip ${item.itemName}?`, description: 'It won’t be given and won’t become a request.', confirmText: 'Skip', note: { label: 'Reason (optional)' } });
@@ -236,10 +271,10 @@ export default function OnboardingDetailPage() {
             </ul>
           ) : (
             <CardContent>
-              <p className="text-sm text-muted-foreground">Nothing planned yet. Add what they should get below{manage ? ', or apply a kit' : ''}.</p>
+              <p className="text-sm text-muted-foreground">Nothing listed yet. Add what {first} needs below{manage ? ', or pick a kit' : ''}.</p>
             </CardContent>
           )}
-          {open && (manage || it) && <AddItem caseId={o.id} onDone={refresh} />}
+          {canEditPlan && <AddItem caseId={o.id} onDone={refresh} />}
         </Card>
 
         <div className="space-y-5">
@@ -248,8 +283,9 @@ export default function OnboardingDetailPage() {
               <CardTitle>Day-1 checklist</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
-              <Check ok={o.items.length > 0 && o.counts.planned === 0} label={`Assets ready (${done}/${o.counts.total})`} />
-              <Check ok={o.status !== 'DRAFT'} label={o.submittedAt ? `Sent to IT ${formatDateTime(o.submittedAt)}` : 'Sent to IT'} />
+              <Check ok={o.status !== 'DRAFT'} label={o.submittedAt && o.status !== 'DRAFT' ? `Sent to IT ${formatDateTime(o.submittedAt)}` : 'Sent to IT'} />
+              <Check ok={approved || o.status === 'COMPLETED'} label={o.approvedAt ? `Approved by IT ${formatDateTime(o.approvedAt)}` : 'Approved by IT'} />
+              <Check ok={o.items.length > 0 && toAssign.length === 0} label={`Everything assigned (${o.counts.issued}/${o.counts.total - o.counts.skipped})`} />
               <Check
                 ok={!!o.login?.isActive}
                 label="Portal login"
@@ -289,8 +325,8 @@ export default function OnboardingDetailPage() {
         </div>
       </div>
 
-      {pickFor && <PickAssetDialog caseId={o.id} item={pickFor} onClose={() => setPickFor(null)} onDone={refresh} />}
       {issueFor && <IssueDialog caseId={o.id} item={issueFor} personName={o.employee.fullName} onClose={() => setIssueFor(null)} onDone={refresh} />}
+      {assignAll && <AssignAllDialog caseId={o.id} items={toAssign} personName={o.employee.fullName} onClose={() => setAssignAll(false)} onDone={refresh} />}
       {dateOpen && <DateDialog caseId={o.id} current={o.joinDate} onClose={() => setDateOpen(false)} onDone={refresh} />}
     </div>
   );
@@ -306,24 +342,22 @@ function Check({ ok, label, action, neutral }: { ok: boolean; label: string; act
   );
 }
 
+const ITEM_LABEL: Record<OnboardingItem['status'], string> = { PLANNED: 'To assign', PREPARED: 'To assign', ISSUED: 'Assigned', SKIPPED: 'Skipped' };
+
 function ItemRow({
   item,
-  open,
-  it,
-  canEdit,
+  canAssign,
+  canRemove,
   busy,
-  onPick,
   onIssue,
   onSkip,
   onUndo,
   onRemove,
 }: {
   item: OnboardingItem;
-  open: boolean;
-  it: boolean;
-  canEdit: boolean;
+  canAssign: boolean;
+  canRemove: boolean;
   busy: boolean;
-  onPick: () => void;
   onIssue: () => void;
   onSkip: () => void;
   onUndo: () => void;
@@ -339,48 +373,39 @@ function ItemRow({
             {item.quantity > 1 ? `${item.quantity} × ` : ''}
             {item.itemName}
           </span>
-          <EnumBadge value={item.status} tones={ONBOARDING_ITEM_TONE} dot={false} />
+          <EnumBadge value={item.status} tones={ONBOARDING_ITEM_TONE} labels={ITEM_LABEL} dot={false} />
           {!item.assetTypeId && <span className="text-[11px] text-muted-foreground">not in catalog</span>}
         </div>
         {item.notes && <p className="text-xs text-muted-foreground">{item.notes}</p>}
-        {a && item.status !== 'SKIPPED' && (
+        {a && item.status === 'ISSUED' && (
           <p className="mt-0.5 text-xs">
-            {item.status === 'ISSUED' ? 'Given: ' : 'Set aside: '}
             <Link to={`/assets/${a.id}`} className="font-mono text-primary hover:underline">
               {a.assetTag}
             </Link>{' '}
             {a.name}
-            {item.status === 'ISSUED' && item.issuedByName ? ` · by ${item.issuedByName} on ${formatDate(item.issuedAt)}` : item.preparedByName ? ` · by ${item.preparedByName}` : ''}
-          </p>
-        )}
-        {item.preparedUnavailable && (
-          <p className="mt-0.5 flex items-center gap-1 text-xs font-medium text-amber-600">
-            <AlertTriangle className="size-3" /> {a?.holderName ? `Now with ${a.holderName}` : 'No longer available'} — pick another
+            {item.issuedByName ? ` · by ${item.issuedByName} on ${formatDate(item.issuedAt)}` : ''}
           </p>
         )}
         {item.status === 'SKIPPED' && item.skipReason && <p className="text-xs text-muted-foreground">Skipped: {item.skipReason}</p>}
       </div>
-      {open && item.status !== 'ISSUED' && (
+      {item.status !== 'ISSUED' && (canAssign || canRemove) && (
         <div className="flex flex-wrap items-center gap-1">
-          {it && item.status !== 'SKIPPED' && (
+          {canAssign && item.status !== 'SKIPPED' && (
             <>
-              <Button size="xs" variant={item.status === 'PLANNED' ? 'outline' : 'ghost'} onClick={onPick} disabled={busy}>
-                {item.status === 'PLANNED' ? 'Pick asset' : 'Change'}
-              </Button>
-              <Button size="xs" variant={item.status === 'PREPARED' ? 'default' : 'ghost'} onClick={onIssue} disabled={busy}>
-                <Gift /> Hand over
+              <Button size="xs" variant="outline" onClick={onIssue} disabled={busy}>
+                <Gift /> Assign
               </Button>
               <Button size="xs" variant="ghost" onClick={onSkip} disabled={busy}>
                 Skip
               </Button>
             </>
           )}
-          {it && item.status === 'SKIPPED' && (
+          {canAssign && item.status === 'SKIPPED' && (
             <Button size="xs" variant="ghost" onClick={onUndo} disabled={busy}>
               <Undo2 /> Undo skip
             </Button>
           )}
-          {canEdit && (
+          {canRemove && (
             <Button size="icon-xs" variant="ghost" aria-label={`Remove ${item.itemName}`} onClick={onRemove} disabled={busy}>
               <Trash2 />
             </Button>
@@ -473,31 +498,46 @@ function ApplyKit({ caseId, onDone }: { caseId: string; onDone: () => Promise<un
   );
 }
 
-function PickAssetDialog({ caseId, item, onClose, onDone }: { caseId: string; item: OnboardingItem; onClose: () => void; onDone: () => Promise<unknown> }) {
-  const [assetId, setAssetId] = useState<string | null>(item.preparedAssetId);
+/** IT picks an asset for every item and assigns them all to the joiner at once. */
+function AssignAllDialog({ caseId, items, personName, onClose, onDone }: { caseId: string; items: OnboardingItem[]; personName: string; onClose: () => void; onDone: () => Promise<unknown> }) {
+  const [picked, setPicked] = useState<Record<string, string | null>>({});
+  const chosen = items.filter((i) => picked[i.id]);
   const save = useMutation({
-    mutationFn: () => api.patch(`/onboarding/${caseId}/items/${item.id}`, { status: 'PREPARED', preparedAssetId: assetId }),
-    onSuccess: async () => {
-      await onDone();
-      toast.success(`${item.itemName} set aside`);
-      onClose();
+    mutationFn: () => api.post<{ assigned: number; results: { ok: boolean; itemName: string; error?: string }[] }>(`/onboarding/${caseId}/assign-all`, { assignments: chosen.map((i) => ({ itemId: i.id, assetId: picked[i.id] })) }),
+    onSuccess: async (r) => {
+      await Promise.all([onDone(), invalidateAssetData()]);
+      if (r.assigned) toast.success(`${r.assigned} item${r.assigned > 1 ? 's' : ''} assigned to ${personName}`);
+      const failed = r.results.filter((x) => !x.ok);
+      if (failed.length) toast.error(`${failed.length} could not be assigned`, { description: failed.map((f) => `${f.itemName}: ${f.error}`).join('\n') });
+      else onClose();
     },
     onError: (err) => toast.error(errorMessage(err)),
   });
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-h-[92dvh] max-w-lg overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Pick {item.itemName}</DialogTitle>
-          <DialogDescription>Choose the one you’ll hand over. This is a note for IT — it isn’t locked, so hand it over before someone else uses it.</DialogDescription>
+          <DialogTitle>Assign to {personName}</DialogTitle>
+          <DialogDescription>Pick the asset for each item. Leave any you don’t have yet — they stay on the list.</DialogDescription>
         </DialogHeader>
-        <EntityPicker kind="asset" value={assetId} onChange={setAssetId} assetFilter={{ assetTypeId: item.assetTypeId ?? undefined, status: 'AVAILABLE,IN_INVENTORY' }} />
+        <div className="grid gap-3">
+          {items.map((i) => (
+            <Field key={i.id} label={`${i.quantity > 1 ? `${i.quantity} × ` : ''}${i.itemName}`} hint={i.notes ?? undefined}>
+              <EntityPicker
+                kind="asset"
+                value={picked[i.id] ?? null}
+                onChange={(v) => setPicked((p) => ({ ...p, [i.id]: v }))}
+                assetFilter={{ assetTypeId: i.assetTypeId ?? undefined, status: 'AVAILABLE,IN_INVENTORY' }}
+              />
+            </Field>
+          ))}
+        </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button disabled={!assetId} loading={save.isPending} onClick={() => save.mutate()}>
-            Set aside
+          <Button disabled={!chosen.length} loading={save.isPending} onClick={() => save.mutate()}>
+            <PackageCheck /> Assign {chosen.length || ''}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -506,7 +546,7 @@ function PickAssetDialog({ caseId, item, onClose, onDone }: { caseId: string; it
 }
 
 function IssueDialog({ caseId, item, personName, onClose, onDone }: { caseId: string; item: OnboardingItem; personName: string; onClose: () => void; onDone: () => Promise<unknown> }) {
-  const [assetId, setAssetId] = useState<string | null>(item.preparedUnavailable ? null : item.preparedAssetId);
+  const [assetId, setAssetId] = useState<string | null>(null);
   const [photos, setPhotos] = useState<File[]>([]);
   const save = useMutation({
     mutationFn: async () => {
@@ -515,13 +555,13 @@ function IssueDialog({ caseId, item, personName, onClose, onDone }: { caseId: st
         try {
           await uploadPhotos(r.assetId, r.allocationId, 'HANDOVER', photos);
         } catch (err) {
-          toast.error(`Handed over, but the photos did not upload: ${errorMessage(err)}`);
+          toast.error(`Assigned, but the photos did not upload: ${errorMessage(err)}`);
         }
       }
     },
     onSuccess: async () => {
       await Promise.all([onDone(), invalidateAssetData()]);
-      toast.success(`${item.itemName} handed over to ${personName}`);
+      toast.success(`${item.itemName} assigned to ${personName}`);
       onClose();
     },
     onError: (err) => toast.error(errorMessage(err)),
@@ -530,12 +570,12 @@ function IssueDialog({ caseId, item, personName, onClose, onDone }: { caseId: st
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[92dvh] max-w-md overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Hand over {item.itemName}</DialogTitle>
+          <DialogTitle>Assign {item.itemName}</DialogTitle>
           <DialogDescription>Assigns it to {personName} now, with optional handover photos.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
           <Field label="Asset" required>
-            <EntityPicker kind="asset" value={assetId} selectedLabel={item.preparedAsset && !item.preparedUnavailable ? `${item.preparedAsset.assetTag} · ${item.preparedAsset.name}` : undefined} onChange={setAssetId} assetFilter={{ assetTypeId: item.assetTypeId ?? undefined, status: 'AVAILABLE,IN_INVENTORY' }} />
+            <EntityPicker kind="asset" value={assetId} onChange={setAssetId} assetFilter={{ assetTypeId: item.assetTypeId ?? undefined, status: 'AVAILABLE,IN_INVENTORY' }} />
           </Field>
           <Field label="Handover photos">
             <PhotoPicker files={photos} onChange={setPhotos} />
@@ -546,7 +586,7 @@ function IssueDialog({ caseId, item, personName, onClose, onDone }: { caseId: st
             Cancel
           </Button>
           <Button disabled={!assetId} loading={save.isPending} onClick={() => save.mutate()}>
-            <Gift /> Hand over
+            <Gift /> Assign
           </Button>
         </DialogFooter>
       </DialogContent>
