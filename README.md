@@ -103,7 +103,7 @@ only sees their own assets and QR. The IT role has full access.
   date. IT sets assets aside and hands them over (with photos); *Mark joined* makes them Active and
   turns anything not yet given into approved requests.
 - **Leadership overview** — for the new *Leadership* role (CEO): headcount, joiners/leavers,
-  assets, IT service health and what each IT team member handled, by 7/30/90 days or a year.
+  assets in use, IT service health and what each IT team member handled, by 7/30/90 days or a year.
 - **Priority queue** — one worklist (`G Q`) of open tickets and requests to approve or fulfil,
   ordered Urgent → High → Medium → Low, then overdue, then oldest; also on the dashboard.
 - **Logins** — IT chooses the login ID, email and password (or generates a password) from the

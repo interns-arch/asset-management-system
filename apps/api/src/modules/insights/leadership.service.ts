@@ -26,7 +26,6 @@ export class LeadershipService {
         on_notice: number;
         assets_in_use: number;
         assets_available: number;
-        asset_value: number;
       }>(sql`select
           (select count(*)::int from employees where status in ('ACTIVE', 'ON_LEAVE', 'NOTICE_PERIOD')) as headcount,
           (select count(*)::int from employees where status <> 'JOINING' and join_date >= (${since})::date) as joiners,
@@ -34,8 +33,7 @@ export class LeadershipService {
           (select count(*)::int from onboarding_cases where status in ('DRAFT', 'SUBMITTED')) as upcoming_joiners,
           (select count(*)::int from employees where status = 'NOTICE_PERIOD') as on_notice,
           (select count(*)::int from assets where status = 'ASSIGNED') as assets_in_use,
-          (select count(*)::int from assets where status = 'AVAILABLE') as assets_available,
-          (select coalesce(sum(purchase_cost), 0)::float from assets where status <> 'DISPOSED') as asset_value`),
+          (select count(*)::int from assets where status = 'AVAILABLE') as assets_available`),
       db.execute<{
         tickets_opened: number;
         tickets_resolved: number;
@@ -96,11 +94,10 @@ export class LeadershipService {
           and r.permissions && array['ticket:manage', 'asset:assign']::text[]
           and r.name not in ('Leadership', 'Employee')
         order by u.name`),
-      db.execute<{ id: string; name: string; headcount: number; on_notice: number; assets_held: number; asset_value: number; pending_recovery: number }>(sql`select d.id, d.name,
+      db.execute<{ id: string; name: string; headcount: number; on_notice: number; assets_held: number; pending_recovery: number }>(sql`select d.id, d.name,
           (select count(*)::int from employees e where e.department_id = d.id and e.status in ('ACTIVE', 'ON_LEAVE', 'NOTICE_PERIOD')) as headcount,
           (select count(*)::int from employees e where e.department_id = d.id and e.status = 'NOTICE_PERIOD') as on_notice,
           (select count(distinct al.asset_id)::int from allocations al join employees e on e.id = al.employee_id where e.department_id = d.id and al.status = 'ACTIVE') as assets_held,
-          (select coalesce(sum(a.purchase_cost), 0)::float from allocations al join employees e on e.id = al.employee_id join assets a on a.id = al.asset_id where e.department_id = d.id and al.status = 'ACTIVE') as asset_value,
           (select count(*)::int from exit_items i join exit_cases c on c.id = i.exit_case_id join employees e on e.id = c.employee_id where e.department_id = d.id and c.status = 'OPEN' and i.status in ('PENDING', 'MISSING')) as pending_recovery
         from departments d
         order by d.name`),
@@ -118,7 +115,6 @@ export class LeadershipService {
         onNotice: h.on_notice,
         assetsInUse: h.assets_in_use,
         assetsAvailable: h.assets_available,
-        assetValue: h.asset_value,
       },
       service: {
         ticketsOpened: s.tickets_opened,
@@ -151,7 +147,7 @@ export class LeadershipService {
         lastActive: r.last_active,
       })),
       departments: departments.rows
-        .map((d) => ({ id: d.id, name: d.name, headcount: d.headcount, onNotice: d.on_notice, assetsHeld: d.assets_held, assetValue: d.asset_value, pendingRecovery: d.pending_recovery }))
+        .map((d) => ({ id: d.id, name: d.name, headcount: d.headcount, onNotice: d.on_notice, assetsHeld: d.assets_held, pendingRecovery: d.pending_recovery }))
         .filter((d) => d.headcount || d.assetsHeld),
     };
   }

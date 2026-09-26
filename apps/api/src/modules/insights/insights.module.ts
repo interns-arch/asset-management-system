@@ -87,7 +87,6 @@ export class DashboardService {
           color: assetCategories.color,
           count: sql<number>`count(${assets.id})::int`,
           assigned: sql<number>`count(${assets.id}) filter (where ${assets.status} = 'ASSIGNED')::int`,
-          value: sql<number>`coalesce(sum(${assets.purchaseCost}), 0)::float`,
         })
         .from(assetCategories)
         .leftJoin(assets, and(eq(assets.categoryId, assetCategories.id), sql`${assets.status} <> 'DISPOSED'`))
@@ -136,7 +135,6 @@ export class DashboardService {
         in_maintenance: number;
         warranty_expiring: number;
         exit_pending_items: number;
-        total_value: number;
       }>(sql`select
           (select count(*)::int from employees where status not in ('EXITED', 'JOINING')) as employees,
           (select count(*)::int from employees where status = 'NOTICE_PERIOD') as on_notice,
@@ -145,8 +143,7 @@ export class DashboardService {
           (select count(*)::int from tickets where status in ('OPEN', 'IN_PROGRESS')) as open_tickets,
           (select count(*)::int from maintenance_records where status = 'IN_PROGRESS') as in_maintenance,
           (select count(*)::int from assets where warranty_expiry between ${now}::date and ${now}::date + 30 and status not in ('DISPOSED', 'RETIRED')) as warranty_expiring,
-          (select count(*)::int from exit_items i join exit_cases c on c.id = i.exit_case_id where c.status = 'OPEN' and i.status in ('PENDING', 'MISSING')) as exit_pending_items,
-          (select coalesce(sum(purchase_cost), 0)::float from assets where status <> 'DISPOSED') as total_value`),
+          (select count(*)::int from exit_items i join exit_cases c on c.id = i.exit_case_id where c.status = 'OPEN' and i.status in ('PENDING', 'MISSING')) as exit_pending_items`),
       db
         .select({
           id: historyEvents.id,
@@ -188,7 +185,6 @@ export class DashboardService {
         available: statusMap.AVAILABLE ?? 0,
         inMaintenance: statusMap.IN_MAINTENANCE ?? 0,
         lost: statusMap.LOST ?? 0,
-        value: c.total_value,
         employees: c.employees,
         onNotice: c.on_notice,
         pendingRequests: c.pending_requests,

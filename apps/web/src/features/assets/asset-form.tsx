@@ -271,9 +271,6 @@ export default function AssetForm({ open, onOpenChange, record, defaults }: Form
               <Field label="Purchase date" error={e('purchaseDate')}>
                 <Input type="date" {...form.register('purchaseDate')} />
               </Field>
-              <Field label="Purchase cost (₹)" error={e('purchaseCost')}>
-                <Input type="number" step="any" min={0} inputMode="decimal" {...form.register('purchaseCost')} />
-              </Field>
               <Field label="Warranty / expiry" error={e('warrantyExpiry')} hint="Warranty end, or expiry for licences and subscriptions.">
                 <Input type="date" {...form.register('warrantyExpiry')} />
               </Field>

@@ -5,11 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { api } from '@/lib/api';
 import { useUrlFilters } from '@/lib/url-state';
-import { cn, formatMoney, formatNumber, relativeTime } from '@/lib/utils';
+import { cn, formatNumber, relativeTime } from '@/lib/utils';
 
 interface Leadership {
   days: number;
-  headline: { headcount: number; joiners: number; leavers: number; upcomingJoiners: number; onNotice: number; assetsInUse: number; assetsAvailable: number; assetValue: number };
+  headline: { headcount: number; joiners: number; leavers: number; upcomingJoiners: number; onNotice: number; assetsInUse: number; assetsAvailable: number };
   service: {
     ticketsOpened: number;
     ticketsResolved: number;
@@ -40,7 +40,7 @@ interface Leadership {
     onboardingItems: number;
     lastActive: string | null;
   }[];
-  departments: { id: string; name: string; headcount: number; onNotice: number; assetsHeld: number; assetValue: number; pendingRecovery: number }[];
+  departments: { id: string; name: string; headcount: number; onNotice: number; assetsHeld: number; pendingRecovery: number }[];
 }
 
 const PERIODS = [
@@ -83,11 +83,10 @@ export default function LeadershipPage() {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-3">
         <StatCard label="People" value={formatNumber(h.headcount)} hint={`${h.joiners} joined · ${h.leavers} left · ${h.onNotice} on notice`} icon={Users} tone="blue" />
         <StatCard label="Joining soon" value={h.upcomingJoiners} hint="Being onboarded" icon={UserPlus} tone="violet" />
         <StatCard label="Assets in use" value={formatNumber(h.assetsInUse)} hint={`${formatNumber(h.assetsAvailable)} available`} icon={Boxes} tone="green" />
-        <StatCard label="Asset value" value={formatMoney(h.assetValue, 'INR', true)} hint="Book value, excluding disposed" icon={Boxes} />
       </div>
 
       <Card>
@@ -182,7 +181,6 @@ export default function LeadershipPage() {
                 <TH>Department</TH>
                 <TH className="text-right">People</TH>
                 <TH className="text-right">Assets held</TH>
-                <TH className="text-right">Asset value</TH>
                 <TH className="text-right">On notice</TH>
                 <TH className="text-right">To recover</TH>
               </TR>
@@ -193,7 +191,6 @@ export default function LeadershipPage() {
                   <TD className="font-medium">{d.name}</TD>
                   <TD className="text-right tabular">{d.headcount}</TD>
                   <TD className="text-right tabular">{d.assetsHeld}</TD>
-                  <TD className="text-right tabular">{formatMoney(d.assetValue, 'INR', true)}</TD>
                   <TD className="text-right tabular">{d.onNotice || '—'}</TD>
                   <TD className={cn('text-right tabular', d.pendingRecovery > 0 && 'font-medium text-amber-600')}>{d.pendingRecovery || '—'}</TD>
                 </TR>

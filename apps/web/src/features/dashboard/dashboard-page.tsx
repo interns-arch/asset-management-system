@@ -16,7 +16,7 @@ import { AssetIcon, COLORS } from '@/lib/icons';
 import { useCompanyName } from '@/lib/config';
 import { ASSET_STATUS_BAR, REQUEST_TONE, TICKET_TONE } from '@/lib/status';
 import type { HeldAsset, HistoryEvent } from '@/lib/types';
-import { cn, daysUntil, formatDate, formatMoney, formatNumber, plural, relativeTime } from '@/lib/utils';
+import { cn, daysUntil, formatDate, formatNumber, plural, relativeTime } from '@/lib/utils';
 
 interface OrgDashboard {
   scope: 'organisation';
@@ -26,7 +26,6 @@ interface OrgDashboard {
     available: number;
     inMaintenance: number;
     lost: number;
-    value: number;
     employees: number;
     onNotice: number;
     pendingRequests: number;
@@ -36,7 +35,7 @@ interface OrgDashboard {
     exitPendingItems: number;
   };
   byStatus: Partial<Record<AssetStatus, number>>;
-  byCategory: { id: string; name: string; icon: string | null; color: string | null; count: number; assigned: number; value: number }[];
+  byCategory: { id: string; name: string; icon: string | null; color: string | null; count: number; assigned: number }[];
   byLocation: { id: string; name: string; count: number }[];
   byHolder: Partial<Record<HolderType, number>>;
   byType: { id: string; name: string; icon: string | null; available: number; total: number }[];
@@ -109,7 +108,7 @@ function OrgView({ data, name }: { data: OrgDashboard; name?: string }) {
       <PageHeader title={`${greeting()}${name ? `, ${name}` : ''}`} description="Here’s what’s happening with your assets today." actions={<QuickActions />} />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total assets" value={formatNumber(t.assets)} hint={`${formatMoney(t.value, 'INR', true)} book value`} icon={Boxes} tone="blue" to="/assets" />
+        <StatCard label="Total assets" value={formatNumber(t.assets)} hint="In the register" icon={Boxes} tone="blue" to="/assets" />
         <StatCard label="Assigned" value={formatNumber(t.assigned)} hint={`${utilisation}% in use`} icon={PackageCheck} tone="violet" to="/assets?status=ASSIGNED" />
         <StatCard label="Available" value={formatNumber(t.available)} hint="Ready to assign" icon={CheckCircle2} tone="green" to="/assets?status=AVAILABLE" />
         <StatCard

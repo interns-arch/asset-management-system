@@ -243,7 +243,6 @@ export default function AssetDetailPage() {
                   { label: 'Owner company', value: a.ownerCompanyName },
                   { label: 'Vendor', value: a.vendorName },
                   { label: 'Purchase date', value: a.purchaseDate && formatDate(a.purchaseDate) },
-                  { label: 'Purchase cost', value: a.purchaseCost !== null ? formatMoney(a.purchaseCost, a.currency) : null },
                   { label: 'Invoice', value: a.invoiceNumber },
                   {
                     label: 'Warranty / expiry',
