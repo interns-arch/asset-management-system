@@ -2,6 +2,8 @@ import { Body, Controller, Get, HttpCode, Module, Param, ParseUUIDPipe, Patch, P
 import {
   employeeAccessSchema,
   type EmployeeAccessInput,
+  employeeCreateSchema,
+  type EmployeeCreateInput,
   employeeSchema,
   type EmployeeInput,
   employeeStatusSchema,
@@ -46,7 +48,7 @@ export class EmployeesController {
 
   @Post()
   @RequirePermissions('employee:manage')
-  create(@CurrentActor() actor: Actor, @Body(new ZodPipe(employeeSchema)) body: EmployeeInput) {
+  create(@CurrentActor() actor: Actor, @Body(new ZodPipe(employeeCreateSchema)) body: EmployeeCreateInput) {
     return this.employees.create(actor, body);
   }
 

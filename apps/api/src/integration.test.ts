@@ -430,6 +430,23 @@ describe('logins of your choice', () => {
     assert.equal((await call('POST', `/employees/${other.body.id}/access`, { username: 'x', password: 'short' }, 'it')).status, 400);
   });
 
+  test('an employee can be added with a role and login in one step', async () => {
+    const roleList = await call('GET', '/roles');
+    const managerRole = roleList.body.find((x: { name: string }) => x.name === 'Manager');
+    const created = await call('POST', '/employees', { employeeCode: 'T310', firstName: 'New', lastName: 'Manager', access: { roleId: managerRole.id, username: 'new.manager', password: 'Manager#2026' } });
+    assert.equal(created.status, 201);
+    assert.equal(created.body.credentials.loginId, 'new.manager');
+    assert.equal(await signIn('new.manager', 'Manager#2026'), 200);
+    const detail = await call('GET', `/employees/${created.body.id}`);
+    assert.equal(detail.body.login.roleName, 'Manager');
+
+    // A clash in the login details rolls the whole thing back — no half-created employee.
+    const clash = await call('POST', '/employees', { employeeCode: 'T311', firstName: 'Clash', access: { username: 'new.manager', password: 'Another#123' } });
+    assert.equal(clash.status, 400);
+    const list = await call('GET', '/employees?search=T311');
+    assert.equal(list.body.total, 0);
+  });
+
   test('a user can be created with only a login ID', async () => {
     const roleList = await call('GET', '/roles');
     const roleId = roleList.body.find((x: { name: string }) => x.name === 'IT / Asset Manager').id;

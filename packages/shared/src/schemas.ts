@@ -348,6 +348,8 @@ export const employeeAccessSchema = z.object({
   email: optEmail,
   password: newPassword,
 });
+/** Adding an employee can also give them a login in the same step. */
+export const employeeCreateSchema = employeeSchema.extend({ access: employeeAccessSchema.nullable().optional() });
 export const userUpdateSchema = z.object({
   name: reqText(150).optional(),
   roleId: reqId.optional(),
@@ -390,4 +392,5 @@ export type MaintenanceUpdateInput = z.infer<typeof maintenanceUpdateSchema>;
 export type UserCreateInput = z.infer<typeof userCreateSchema>;
 export type UserUpdateInput = z.infer<typeof userUpdateSchema>;
 export type EmployeeAccessInput = z.infer<typeof employeeAccessSchema>;
+export type EmployeeCreateInput = z.infer<typeof employeeCreateSchema>;
 export type RoleInput = z.infer<typeof roleSchema>;

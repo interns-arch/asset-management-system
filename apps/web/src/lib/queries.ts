@@ -1,6 +1,6 @@
 import { keepPreviousData, QueryClient, useQuery } from '@tanstack/react-query';
 import { api, ApiError, type Page } from './api';
-import type { AssetType, AssetTypeDetail, Category, LocationOption, OrgEntity } from './types';
+import type { AssetType, AssetTypeDetail, Category, LocationOption, OrgEntity, Role } from './types';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,6 +28,9 @@ export function useLocations() {
 }
 export function useVendors() {
   return useQuery({ queryKey: ['lookup', 'vendors'], queryFn: () => api.get<Page<OrgEntity>>('/vendors', { all: 1 }).then((p) => p.items), staleTime: LOOKUP_STALE, placeholderData: undefined });
+}
+export function useRoles() {
+  return useQuery({ queryKey: ['roles'], queryFn: () => api.get<Role[]>('/roles'), staleTime: LOOKUP_STALE, placeholderData: undefined });
 }
 export function useCategories() {
   return useQuery({ queryKey: ['categories'], queryFn: () => api.get<Category[]>('/categories'), staleTime: LOOKUP_STALE, placeholderData: undefined });

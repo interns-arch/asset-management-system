@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, desc, eq, ilike, inArray, or, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
-import { EMPLOYEE_STATUS_LABELS, EMPLOYEE_STATUSES, type EmployeeAccessInput, type EmployeeInput, type EmployeeStatusInput } from '@eam/shared';
+import { EMPLOYEE_STATUS_LABELS, EMPLOYEE_STATUSES, type EmployeeAccessInput, type EmployeeCreateInput, type EmployeeInput, type EmployeeStatusInput } from '@eam/shared';
 import { type Actor, assertCan, can } from '../../common/actor';
 import { normaliseCode, qrToken } from '../../common/codes';
 import { badRequest, likePattern, listFilter, listParams, notFound, today, uuidParam } from '../../common/http';
@@ -163,7 +163,7 @@ export class EmployeesService {
     const [heldAssets, [login], exitCase, reports] = await Promise.all([
       this.assets(actor, id),
       db
-        .select({ id: users.id, email: users.email, username: users.username, isActive: users.isActive, roleName: roles.name, lastLoginAt: users.lastLoginAt })
+        .select({ id: users.id, email: users.email, username: users.username, isActive: users.isActive, roleId: users.roleId, roleName: roles.name, lastLoginAt: users.lastLoginAt })
         .from(users)
         .innerJoin(roles, eq(roles.id, users.roleId))
         .where(eq(users.employeeId, id)),
@@ -278,6 +278,8 @@ export class EmployeesService {
       const [employeeRole] = await db.select({ id: roles.id }).from(roles).where(eq(roles.name, 'Employee'));
       const roleId = input.roleId ?? employeeRole?.id;
       if (!roleId) throw badRequest('Choose a role', { roleId: 'Required' });
+      const [role] = await db.select({ id: roles.id }).from(roles).where(eq(roles.id, roleId));
+      if (!role) throw badRequest('That role no longer exists', { roleId: 'Not found' });
       const password = input.password ?? `${qrToken(4)}-${qrToken(4)}`;
       const passwordHash = await hashPassword(password);
       const [existing] = await db.select().from(users).where(eq(users.employeeId, id));
@@ -317,10 +319,12 @@ export class EmployeesService {
     if (managerId === id) throw badRequest('An employee cannot manage themselves', { managerId: 'Cannot be the same employee' });
   }
 
-  async create(actor: Actor, input: EmployeeInput) {
+  async create(actor: Actor, input: EmployeeCreateInput) {
     await this.assertManager(null, input.managerId);
+    const { access, ...fields } = input;
+    if (access) assertCan(actor, 'user:manage');
     return this.dbs.tx(async (db) => {
-      const [row] = await db.insert(employees).values({ ...input, companyId: input.companyId ?? (await this.dbs.defaultCompanyId()) }).returning();
+      const [row] = await db.insert(employees).values({ ...fields, companyId: fields.companyId ?? (await this.dbs.defaultCompanyId()) }).returning();
       await this.history.record(actor, {
         entityType: 'EMPLOYEE',
         entityId: row.id,
@@ -328,7 +332,8 @@ export class EmployeesService {
         action: 'CREATED',
         summary: `Employee ${row.fullName} (${row.employeeCode}) added`,
       });
-      return row;
+      const credentials = access ? await this.grantAccess(actor, row.id, access) : null;
+      return { ...row, credentials };
     });
   }
 
