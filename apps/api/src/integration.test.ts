@@ -507,8 +507,32 @@ describe('logins of your choice', () => {
     const created = await call('POST', '/users', { name: 'Store Keeper', username: 'store1', password: 'Store#2026', roleId });
     assert.equal(created.status, 201);
     assert.equal(await signIn('store1', 'Store#2026'), 200);
-    const cleared = await call('PATCH', `/users/${created.body.id}`, { username: null });
-    assert.equal(cleared.status, 400);
+  });
+
+  test('every new login is on the employee list, except leadership', async () => {
+    const roleList = await call('GET', '/roles');
+    const roleId = (name: string) => roleList.body.find((x: { name: string }) => x.name === name).id;
+    const users = async () => (await call('GET', '/users?pageSize=100')).body.items as { id: string; employeeId: string | null; employeeCode: string | null }[];
+
+    const hr = await call('POST', '/users', { name: 'Neha Verma', username: 'neha.hr', password: 'Hr#2026ok', roleId: roleId('HR'), employeeCode: 't-hr01' });
+    assert.equal(hr.status, 201);
+    const hrRow = (await users()).find((u) => u.id === hr.body.id)!;
+    assert.equal(hrRow.employeeCode, 'T-HR01');
+    const person = await call('GET', `/employees/${hrRow.employeeId}`);
+    assert.equal(person.body.fullName, 'Neha Verma');
+    assert.equal(person.body.status, 'ACTIVE');
+
+    const auto = await call('POST', '/users', { name: 'Ravi Admin', username: 'ravi.admin', password: 'Admin#2026', roleId: roleId('Admin') });
+    assert.match((await users()).find((u) => u.id === auto.body.id)!.employeeCode ?? '', /^STAFF-\d{3}$/);
+
+    const taken = await call('POST', '/users', { name: 'Clash', username: 'clash1', password: 'Clash#2026', roleId: roleId('HR'), employeeCode: 'T-HR01' });
+    assert.equal(taken.status, 400);
+
+    const ceo = await call('POST', '/users', { name: 'Test CEO', username: 'ceo1', password: 'Ceo#2026ok', roleId: roleId('Leadership') });
+    assert.equal(ceo.status, 201);
+    assert.equal((await users()).find((u) => u.id === ceo.body.id)!.employeeId, null);
+    // With no employee behind it, the login ID is their only way in.
+    assert.equal((await call('PATCH', `/users/${ceo.body.id}`, { username: null })).status, 400);
   });
 });
 

@@ -344,6 +344,8 @@ export const userCreateSchema = z
     password: z.string().min(8, 'At least 8 characters').max(200),
     roleId: reqId,
     employeeId: optId,
+    /** Without a linked employee, one is added with this ID (numbered STAFF-001… when blank). */
+    employeeCode: z.preprocess(blankToNull, z.string().trim().max(40, 'Too long').toUpperCase().nullable().optional()),
     isActive: z.boolean().default(true),
   })
   .refine((v) => !!v.email || !!v.employeeId || !!v.username, {

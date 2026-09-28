@@ -83,8 +83,12 @@ function UserSheet({ user, onClose }: { user: UserRow | null; onClose: () => voi
     password: '',
     roleId: user?.roleId ?? '',
     employeeId: user?.employeeId ?? '',
+    ...(editing ? {} : { employeeCode: '' }),
     isActive: user?.isActive ?? true,
   });
+  const role = roles.data?.find((r) => r.id === form.watch('roleId'));
+  // A new login for anyone but leadership also puts them on the employee list.
+  const addsEmployee = !editing && !form.watch('employeeId') && !!role && !role.permissions.includes('insights:leadership');
   const e = (n: string) => errorOf(form, n);
   const save = useMutation({ mutationFn: (body: unknown) => (editing ? api.patch(`/users/${user!.id}`, body) : api.post('/users', body)) });
   const close = (o: boolean) => {
@@ -133,6 +137,11 @@ function UserSheet({ user, onClose }: { user: UserRow | null; onClose: () => voi
         <Field label="Linked employee" error={e('employeeId')} hint="Lets them see “My assets” and raise requests">
           <EntityPicker kind="EMPLOYEE" value={(form.watch('employeeId') as string) || null} selectedLabel={user?.employeeName} onChange={(v) => form.setValue('employeeId', v ?? '')} />
         </Field>
+        {addsEmployee && (
+          <Field label="Employee ID" error={e('employeeCode')} hint="They are added to Employees with this ID. Leave blank to number it automatically (STAFF-001).">
+            <Input autoComplete="off" className="font-mono uppercase" placeholder="STAFF-001" {...form.register('employeeCode' as 'name')} />
+          </Field>
+        )}
         <Controller
           control={form.control}
           name="isActive"
