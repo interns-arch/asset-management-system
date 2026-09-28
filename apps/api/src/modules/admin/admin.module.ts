@@ -13,6 +13,7 @@ import {
 } from '@eam/shared';
 import type { Actor } from '../../common/actor';
 import { badRequest, conflict, CurrentActor, likePattern, listParams, notFound, RequirePermissions, ZodPipe } from '../../common/http';
+import { SequenceService } from '../../core/sequence.service';
 import { DbService } from '../../db/db.service';
 import { employees, roles, users } from '../../db/schema';
 import { diffChanges, HistoryService } from '../../core/history.service';
@@ -39,6 +40,7 @@ export class AdminService {
     private readonly dbs: DbService,
     private readonly history: HistoryService,
     private readonly auth: AuthService,
+    private readonly sequences: SequenceService,
   ) {}
 
   async listUsers(q: Record<string, string>) {
@@ -64,13 +66,33 @@ export class AdminService {
   async createUser(actor: Actor, input: UserCreateInput) {
     return this.dbs.tx(async (db) => {
       await this.auth.assertLoginFree(input, { employeeId: input.employeeId });
+      const [role] = await db.select({ permissions: roles.permissions }).from(roles).where(eq(roles.id, input.roleId));
+      if (!role) throw badRequest('That role no longer exists', { roleId: 'Not found' });
+      const { employeeCode, ...values } = input;
+      // Everyone with a login is on the employee list, except the CEO / leadership.
+      const employeeId = input.employeeId ?? (role.permissions.includes('insights:leadership') ? null : await this.addStaffEmployee(actor, input.name, input.email ?? null, employeeCode ?? null));
       const [row] = await db
         .insert(users)
-        .values({ ...input, passwordHash: await hashPassword(input.password) })
+        .values({ ...values, employeeId, passwordHash: await hashPassword(input.password) })
         .returning({ id: users.id, name: users.name, email: users.email });
       await this.history.record(actor, { entityType: 'USER', entityId: row.id, entityLabel: row.email ?? row.name, action: 'CREATED', summary: `User ${row.email ?? row.name} created` });
       return row;
     });
+  }
+
+  private async addStaffEmployee(actor: Actor, name: string, email: string | null, code: string | null) {
+    const db = this.dbs.db;
+    const employeeCode = code ?? (await this.sequences.next('STAFF', 3));
+    const [codeTaken] = await db.select({ id: employees.id }).from(employees).where(sql`lower(${employees.employeeCode}) = lower(${employeeCode})`);
+    if (codeTaken) throw badRequest('Another employee already has this employee ID', { employeeCode: 'Already in use' });
+    const [emailTaken] = email ? await db.select({ id: employees.id }).from(employees).where(sql`lower(${employees.email}) = lower(${email})`) : [];
+    const [firstName, ...rest] = name.trim().split(/\s+/);
+    const [emp] = await db
+      .insert(employees)
+      .values({ employeeCode, firstName, lastName: rest.join(' ') || null, email: emailTaken ? null : email, companyId: await this.dbs.defaultCompanyId() })
+      .returning({ id: employees.id, fullName: employees.fullName });
+    await this.history.record(actor, { entityType: 'EMPLOYEE', entityId: emp.id, entityLabel: emp.fullName, employeeId: emp.id, action: 'CREATED', summary: `${emp.fullName} (${employeeCode}) added with their portal login` });
+    return emp.id;
   }
 
   async updateUser(actor: Actor, id: string, input: UserUpdateInput) {
