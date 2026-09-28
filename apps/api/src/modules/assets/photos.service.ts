@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray } from 'drizzle-orm';
-import type { Actor } from '../../common/actor';
+import { type Actor, assertCan, canAny } from '../../common/actor';
 import { badRequest, notFound } from '../../common/http';
 import { DbService } from '../../db/db.service';
 import { allocationPhotos, allocations, assets, PHOTO_KINDS } from '../../db/schema';
@@ -38,46 +38,72 @@ export class PhotosService {
 
   async upload(actor: Actor, assetId: string, allocationId: string | undefined, kind: string | undefined, files: UploadedPhoto[] | undefined) {
     if (!files?.length) throw badRequest('Choose at least one photo', { photos: 'Required' });
-    if (!PHOTO_KINDS.includes(kind as PhotoKind)) throw badRequest('Photo kind must be HANDOVER or RETURN', { kind: 'Invalid' });
-    if (!allocationId) throw badRequest('allocationId is required', { allocationId: 'Required' });
+    if (!PHOTO_KINDS.includes(kind as PhotoKind)) throw badRequest('Photo kind must be ASSET, HANDOVER or RETURN', { kind: 'Invalid' });
+    const assetPhoto = kind === 'ASSET';
+    if (assetPhoto) {
+      if (!canAny(actor, 'asset:create', 'asset:edit')) assertCan(actor, 'asset:edit');
+    } else {
+      assertCan(actor, 'asset:assign');
+      if (!allocationId) throw badRequest('allocationId is required', { allocationId: 'Required' });
+    }
     const detected = files.map((f) => sniff(f.buffer));
     if (detected.some((d) => !d)) throw badRequest('Only JPEG, PNG or WebP photos can be uploaded', { photos: 'Not an image' });
 
     const db = this.dbs.db;
-    const [row] = await db
-      .select({ alloc: allocations, assetTag: assets.assetTag, assetName: assets.name })
-      .from(allocations)
-      .innerJoin(assets, eq(assets.id, allocations.assetId))
-      .where(and(eq(allocations.id, allocationId), eq(allocations.assetId, assetId)));
-    if (!row) throw notFound('Assignment');
-
-    const dir = uploadDir();
-    await mkdir(dir, { recursive: true });
-    const saved: (typeof allocationPhotos.$inferInsert)[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const type = detected[i]!;
-      const fileName = `${randomUUID()}.${type.ext}`;
-      await writeFile(path.join(dir, fileName), files[i].buffer);
-      saved.push({ assetId, allocationId, kind: kind as PhotoKind, fileName, mimeType: type.mime, sizeBytes: files[i].size, uploadedBy: actor.userId, uploadedByName: actor.name });
+    const [asset] = await db.select({ assetTag: assets.assetTag, name: assets.name }).from(assets).where(eq(assets.id, assetId));
+    if (!asset) throw notFound('Asset');
+    let alloc: typeof allocations.$inferSelect | null = null;
+    if (!assetPhoto) {
+      [alloc] = await db
+        .select()
+        .from(allocations)
+        .where(and(eq(allocations.id, allocationId!), eq(allocations.assetId, assetId)));
+      if (!alloc) throw notFound('Assignment');
     }
-    const inserted = await db.insert(allocationPhotos).values(saved).returning();
+
+    const saved: (typeof allocationPhotos.$inferInsert)[] = files.map((f, i) => {
+      const type = detected[i]!;
+      return {
+        assetId,
+        allocationId: alloc?.id ?? null,
+        kind: kind as PhotoKind,
+        data: f.buffer,
+        fileName: `${randomUUID()}.${type.ext}`,
+        mimeType: type.mime,
+        sizeBytes: f.size,
+        uploadedBy: actor.userId,
+        uploadedByName: actor.name,
+      };
+    });
+    const inserted = await db.insert(allocationPhotos).values(saved).returning(PUBLIC_COLUMNS);
+    const n = inserted.length;
+    const label = assetPhoto ? 'asset' : kind === 'HANDOVER' ? 'handover' : 'return';
     await this.history.record(actor, {
       entityType: 'ASSET',
       entityId: assetId,
-      entityLabel: `${row.assetTag} · ${row.assetName}`,
-      action: kind === 'HANDOVER' ? 'HANDOVER_PHOTOS' : 'RETURN_PHOTOS',
-      summary: `${inserted.length} ${kind === 'HANDOVER' ? 'handover' : 'return'} photo${inserted.length > 1 ? 's' : ''} saved (${row.alloc.holderName})`,
-      employeeId: row.alloc.employeeId,
-      metadata: { allocationId, photoIds: inserted.map((p) => p.id) },
+      entityLabel: `${asset.assetTag} · ${asset.name}`,
+      action: assetPhoto ? 'ASSET_PHOTOS' : kind === 'HANDOVER' ? 'HANDOVER_PHOTOS' : 'RETURN_PHOTOS',
+      summary: `${n} ${label} photo${n > 1 ? 's' : ''} saved${alloc ? ` (${alloc.holderName})` : ''}`,
+      employeeId: alloc?.employeeId ?? null,
+      metadata: { allocationId: alloc?.id ?? null, photoIds: inserted.map((p) => p.id) },
     });
-    return inserted.map(publicPhoto);
+    return inserted;
+  }
+
+  async forAsset(assetId: string) {
+    const rows = await this.dbs.db
+      .select(PUBLIC_COLUMNS)
+      .from(allocationPhotos)
+      .where(and(eq(allocationPhotos.assetId, assetId), eq(allocationPhotos.kind, 'ASSET')))
+      .orderBy(asc(allocationPhotos.createdAt));
+    return rows;
   }
 
   async forAllocations(ids: string[]) {
-    if (!ids.length) return new Map<string, ReturnType<typeof publicPhoto>[]>();
-    const rows = await this.dbs.db.select().from(allocationPhotos).where(inArray(allocationPhotos.allocationId, ids)).orderBy(asc(allocationPhotos.createdAt));
-    const map = new Map<string, ReturnType<typeof publicPhoto>[]>();
-    for (const r of rows) map.set(r.allocationId, [...(map.get(r.allocationId) ?? []), publicPhoto(r)]);
+    if (!ids.length) return new Map<string, PublicPhoto[]>();
+    const rows = await this.dbs.db.select(PUBLIC_COLUMNS).from(allocationPhotos).where(inArray(allocationPhotos.allocationId, ids)).orderBy(asc(allocationPhotos.createdAt));
+    const map = new Map<string, PublicPhoto[]>();
+    for (const r of rows) if (r.allocationId) map.set(r.allocationId, [...(map.get(r.allocationId) ?? []), r]);
     return map;
   }
 
@@ -92,10 +118,17 @@ export class PhotosService {
       .from(allocationPhotos)
       .where(and(eq(allocationPhotos.id, photoId), eq(allocationPhotos.assetId, assetId)));
     if (!photo) throw notFound('Photo');
-    return { path: path.join(uploadDir(), photo.fileName), mimeType: photo.mimeType };
+    return { data: photo.data ?? (await readFile(path.join(uploadDir(), photo.fileName)).catch(() => null)), mimeType: photo.mimeType };
   }
 }
 
-function publicPhoto(p: typeof allocationPhotos.$inferSelect) {
-  return { id: p.id, assetId: p.assetId, allocationId: p.allocationId, kind: p.kind, uploadedByName: p.uploadedByName, createdAt: p.createdAt };
-}
+const PUBLIC_COLUMNS = {
+  id: allocationPhotos.id,
+  assetId: allocationPhotos.assetId,
+  allocationId: allocationPhotos.allocationId,
+  kind: allocationPhotos.kind,
+  uploadedByName: allocationPhotos.uploadedByName,
+  createdAt: allocationPhotos.createdAt,
+};
+
+type PublicPhoto = { id: string; assetId: string; allocationId: string | null; kind: PhotoKind; uploadedByName: string | null; createdAt: Date };

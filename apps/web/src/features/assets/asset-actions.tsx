@@ -142,11 +142,9 @@ function AssignBody({ dialog, onClose, onDone }: { dialog: Extract<AssetDialog, 
         <Field label="Notes">
           <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Handover notes, accessories included…" />
         </Field>
-        {!give && (
-          <Field label="Handover photos">
-            <PhotoPicker files={photos} onChange={setPhotos} />
-          </Field>
-        )}
+        <Field label="Handover photos">
+          <PhotoPicker files={photos} onChange={setPhotos} />
+        </Field>
       </div>
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>

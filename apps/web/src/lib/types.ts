@@ -158,8 +158,8 @@ export interface Allocation {
 export interface AllocationPhoto {
   id: string;
   assetId: string;
-  allocationId: string;
-  kind: 'HANDOVER' | 'RETURN';
+  allocationId: string | null;
+  kind: 'ASSET' | 'HANDOVER' | 'RETURN';
   uploadedByName: string | null;
   createdAt: string;
 }
@@ -220,6 +220,8 @@ export interface AssetDetail extends Omit<AssetListItem, 'categoryName' | 'categ
   fields: FieldDefinition[];
   archivedFields: FieldDefinition[];
   activeAllocations: Allocation[];
+  /** Photos taken when the asset was added. */
+  photos: AllocationPhoto[];
   openMaintenance: MaintenanceRecord[];
   openExits: { id: string; caseNumber: string; employeeId: string; lastWorkingDate: string; employeeName: string }[];
 }

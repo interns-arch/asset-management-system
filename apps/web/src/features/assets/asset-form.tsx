@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { attributesToForm, DynamicFields } from '@/components/common/dynamic-fields';
 import { applyServerErrors, errorOf, Field, FormSection, useZodForm } from '@/components/common/form';
 import { FormSheet } from '@/components/common/form-sheet';
+import { PhotoPicker, uploadPhotos } from '@/components/common/photos';
 import { Combobox, EntityPicker, HolderPicker } from '@/components/common/pickers';
 import { Button } from '@/components/ui/button';
 import { Input, NativeSelect, Textarea } from '@/components/ui/input';
@@ -47,6 +48,7 @@ export default function AssetForm({ open, onOpenChange, record, defaults }: Form
   const [holderType, setHolderType] = useState<HolderType>(defaults?.holderType ?? 'EMPLOYEE');
   const [holderId, setHolderId] = useState<string | null>(defaults?.holderId ?? null);
   const [holderError, setHolderError] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<File[]>([]);
 
   const schema = useMemo(() => (editing ? assetUpdateSchema : assetCreateSchema).extend({ attributes: buildAttributesSchema(fields) }), [editing, fields]);
 
@@ -117,6 +119,10 @@ export default function AssetForm({ open, onOpenChange, record, defaults }: Form
         : { ...values, assetTypeId: typeId, assignTo: assignNow && holderId ? { holderType, holderId } : null };
       try {
         const saved = await save.mutateAsync(body);
+        if (!editing && photos.length) {
+          // The asset is already saved; a failed upload must not look like a failed save.
+          await uploadPhotos(saved.id, null, 'ASSET', photos).catch((err) => toast.error(`Asset added, but the photos did not upload: ${errorMessage(err)}`));
+        }
         await invalidateAssetData();
         if (editing) {
           toast.success('Asset updated');
@@ -130,6 +136,7 @@ export default function AssetForm({ open, onOpenChange, record, defaults }: Form
         if (addAnother) {
           form.reset({ ...form.getValues(), name: '', serialNumber: '', attributes: attributesToForm(fields, {}) });
           setHolderId(null);
+          setPhotos([]);
         } else {
           onOpenChange(false);
         }
@@ -276,6 +283,15 @@ export default function AssetForm({ open, onOpenChange, record, defaults }: Form
               <Textarea rows={2} {...form.register('description')} />
             </Field>
           </FormSection>
+
+          {!editing && (
+            <>
+              <Separator />
+              <FormSection title="Photos">
+                <PhotoPicker files={photos} onChange={setPhotos} hint="Optional · up to 6 photos of the asset as it arrives" />
+              </FormSection>
+            </>
+          )}
 
           {!editing && can('asset:assign') && (
             <>
