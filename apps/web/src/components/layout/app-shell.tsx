@@ -325,7 +325,7 @@ export function AppShell() {
                 <DropdownMenuItem
                   onSelect={async () => {
                     await logout();
-                    navigate('/login');
+                    navigate('/login', { replace: true });
                   }}
                 >
                   <LogOut /> Sign out

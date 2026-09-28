@@ -44,8 +44,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     await api.post('/auth/logout').catch(() => {});
-    qc.clear();
+    await qc.cancelQueries();
+    // Update "me" through its live observer first (clear() would detach it and leave the old user
+    // on screen), then drop everything else this user loaded.
     qc.setQueryData(['me'], null);
+    qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' });
   }, [qc]);
 
   const value = useMemo<AuthState>(
