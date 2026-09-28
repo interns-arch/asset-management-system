@@ -26,13 +26,15 @@ async function compress(file: File): Promise<Blob> {
   }
 }
 
-export async function uploadPhotos(assetId: string, allocationId: string, kind: AllocationPhoto['kind'], files: File[]) {
+export async function uploadPhotos(assetId: string, allocationId: string | null, kind: AllocationPhoto['kind'], files: File[]) {
   const form = new FormData();
-  form.append('allocationId', allocationId);
+  if (allocationId) form.append('allocationId', allocationId);
   form.append('kind', kind);
   for (const f of files) form.append('photos', await compress(f), f.name.replace(/\.\w+$/, '') + '.jpg');
   return api.upload<AllocationPhoto[]>(`/assets/${assetId}/photos`, form);
 }
+
+const KIND_LABEL: Record<AllocationPhoto['kind'], string> = { ASSET: 'Asset', HANDOVER: 'Handover', RETURN: 'Return' };
 
 export const photoUrl = (p: Pick<AllocationPhoto, 'assetId' | 'id'>) => `/api/assets/${p.assetId}/photos/${p.id}`;
 
@@ -93,13 +95,15 @@ export function PhotoStrip({ photos, className, size = 'md' }: { photos: Allocat
             key={p.id}
             type="button"
             onClick={() => setOpen(i)}
-            title={`${p.kind === 'HANDOVER' ? 'Handover' : 'Return'} photo`}
+            title={`${KIND_LABEL[p.kind]} photo`}
             className={cn('relative shrink-0 cursor-pointer overflow-hidden rounded-md border bg-muted transition hover:ring-2 hover:ring-primary/40', size === 'sm' ? 'size-9' : 'size-14')}
           >
             <img src={photoUrl(p)} alt="" loading="lazy" className="size-full object-cover" />
-            <span className={cn('absolute inset-x-0 bottom-0 text-center text-[9px] font-semibold leading-3 text-white', p.kind === 'HANDOVER' ? 'bg-blue-600/80' : 'bg-emerald-600/80')}>
-              {size === 'md' ? (p.kind === 'HANDOVER' ? 'OUT' : 'IN') : ''}
-            </span>
+            {p.kind !== 'ASSET' && (
+              <span className={cn('absolute inset-x-0 bottom-0 text-center text-[9px] font-semibold leading-3 text-white', p.kind === 'HANDOVER' ? 'bg-blue-600/80' : 'bg-emerald-600/80')}>
+                {size === 'md' ? (p.kind === 'HANDOVER' ? 'OUT' : 'IN') : ''}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -108,7 +112,7 @@ export function PhotoStrip({ photos, className, size = 'md' }: { photos: Allocat
           {current && (
             <>
               <DialogHeader>
-                <DialogTitle>{current.kind === 'HANDOVER' ? 'Handover photo' : 'Return photo'}</DialogTitle>
+                <DialogTitle>{KIND_LABEL[current.kind]} photo</DialogTitle>
                 <DialogDescription>
                   {formatDateTime(current.createdAt)}
                   {current.uploadedByName ? ` · by ${current.uploadedByName}` : ''} · {open! + 1} of {photos.length}

@@ -368,6 +368,7 @@ export class AssetsService {
       fields,
       archivedFields: archived.filter((f) => row.asset.attributes[f.key] !== undefined),
       activeAllocations: await this.photos.withPhotos(active),
+      photos: await this.photos.forAsset(id),
       openMaintenance: maintenance,
       openExits,
     };

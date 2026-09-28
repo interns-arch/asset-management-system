@@ -254,6 +254,7 @@ export default function AssetDetailPage() {
                   },
                   { label: 'Added', value: formatDate(a.createdAt) },
                   ...(a.description ? [{ label: 'Notes', value: a.description, full: true }] : []),
+                  ...(a.photos.length ? [{ label: 'Photos', value: <PhotoStrip photos={a.photos} />, full: true }] : []),
                 ]}
               />
             </CardContent>

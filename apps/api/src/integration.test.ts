@@ -314,6 +314,23 @@ describe('custody and lifecycle', () => {
     assert.ok(denied.status === 403 || denied.status === 404);
   });
 
+  test('photos taken when an asset is added need no assignment and show on the asset', async () => {
+    const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(32, 1)]);
+    const drone = await newDrone({ name: 'Photo drone' });
+    const id = drone.body.id;
+    assert.equal((await upload(`/assets/${id}/photos`, { kind: 'ASSET' }, [png], 'bob')).status, 403);
+    assert.equal((await upload(`/assets/${id}/photos`, { kind: 'HANDOVER' }, [png])).status, 400);
+    const saved = await upload(`/assets/${id}/photos`, { kind: 'ASSET' }, [png]);
+    assert.equal(saved.status, 201);
+    assert.equal(saved.body[0].allocationId, null);
+
+    const detail = await call('GET', `/assets/${id}`);
+    assert.deepEqual(detail.body.photos.map((p: { id: string }) => p.id), [saved.body[0].id]);
+    const res = await fetch(`${base}/assets/${id}/photos/${saved.body[0].id}`, { headers: { cookie: cookies.admin } });
+    assert.equal(res.headers.get('content-type'), 'image/png');
+    assert.ok(Buffer.from(await res.arrayBuffer()).equals(png));
+  });
+
   test('one branch: "in store" needs no location', async () => {
     const drone = await newDrone({ name: 'Store drone' });
     const r = await call('POST', `/assets/${drone.body.id}/assign`, { holderType: 'INVENTORY' });

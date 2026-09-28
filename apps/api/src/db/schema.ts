@@ -47,6 +47,12 @@ const tsvector = customType<{ data: string }>({
   },
 });
 
+const bytea = customType<{ data: Buffer }>({
+  dataType() {
+    return 'bytea';
+  },
+});
+
 const pk = () => uuid('id').primaryKey().defaultRandom();
 const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
 const updatedAt = () => timestamp('updated_at', { withTimezone: true }).notNull().defaultNow();
@@ -377,9 +383,9 @@ export const allocations = pgTable(
   ],
 );
 
-export const PHOTO_KINDS = ['HANDOVER', 'RETURN'] as const;
+export const PHOTO_KINDS = ['ASSET', 'HANDOVER', 'RETURN'] as const;
 
-/** Condition photos taken when an asset is handed over or returned. Files live in UPLOAD_DIR. */
+/** Photos of an asset: when added (ASSET, no assignment), handed over or returned. */
 export const allocationPhotos = pgTable(
   'allocation_photos',
   {
@@ -387,10 +393,11 @@ export const allocationPhotos = pgTable(
     assetId: uuid('asset_id')
       .notNull()
       .references(() => assets.id, { onDelete: 'cascade' }),
-    allocationId: uuid('allocation_id')
-      .notNull()
-      .references(() => allocations.id, { onDelete: 'cascade' }),
+    allocationId: uuid('allocation_id').references(() => allocations.id, { onDelete: 'cascade' }),
     kind: text('kind', { enum: PHOTO_KINDS }).notNull(),
+    // Hosts like Render wipe the disk on every restart, so the image lives in the database.
+    // Older rows have no data and are read from UPLOAD_DIR/file_name.
+    data: bytea('data'),
     fileName: text('file_name').notNull(),
     mimeType: text('mime_type').notNull(),
     sizeBytes: integer('size_bytes').notNull(),

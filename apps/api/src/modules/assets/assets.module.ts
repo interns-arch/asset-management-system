@@ -18,7 +18,7 @@ import {
   type TransferInput,
 } from '@eam/shared';
 import type { Actor } from '../../common/actor';
-import { badRequest, CurrentActor, RequirePermissions, ZodPipe } from '../../common/http';
+import { badRequest, CurrentActor, notFound, RequirePermissions, ZodPipe } from '../../common/http';
 import { CatalogModule } from '../catalog/catalog.module';
 import { AllocationService } from './allocation.service';
 import { AssetsService } from './assets.service';
@@ -106,7 +106,6 @@ export class AssetsController {
   }
 
   @Post(':id/photos')
-  @RequirePermissions('asset:assign')
   @UseInterceptors(FilesInterceptor('photos', MAX_PHOTOS_PER_UPLOAD, { limits: { fileSize: MAX_PHOTO_BYTES, files: MAX_PHOTOS_PER_UPLOAD } }))
   uploadPhotos(
     @CurrentActor() actor: Actor,
@@ -121,8 +120,9 @@ export class AssetsController {
   async photo(@CurrentActor() actor: Actor, @Param('id', ParseUUIDPipe) id: string, @Param('photoId', ParseUUIDPipe) photoId: string, @Res() res: Response) {
     await this.assets.assertCanView(actor, id);
     const file = await this.photos.file(id, photoId);
+    if (!file.data) throw notFound('Photo file');
     res.setHeader('Cache-Control', 'private, max-age=86400, immutable');
-    res.type(file.mimeType).sendFile(file.path, { dotfiles: 'allow' });
+    res.type(file.mimeType).send(file.data);
   }
 
   @Post(':id/lifecycle')
