@@ -8,7 +8,7 @@ import { badRequest, likePattern, listFilter, listParams, notFound, today, uuidP
 import { DbService } from '../../db/db.service';
 import { allocations, assetCategories, assets, assetTypes, companies, departments, employees, exitCases, locations, onboardingCases, roles, users } from '../../db/schema';
 import { diffChanges, HistoryService } from '../../core/history.service';
-import { AuthService, hashPassword } from '../auth/auth.service';
+import { AuthService } from '../auth/auth.service';
 import { ExitService } from '../exit/exit.service';
 
 const manager = alias(employees, 'manager');
@@ -278,7 +278,7 @@ export class EmployeesService {
       const [role] = await db.select({ id: roles.id }).from(roles).where(eq(roles.id, roleId));
       if (!role) throw badRequest('That role no longer exists', { roleId: 'Not found' });
       const password = input.password ?? `${qrToken(4)}-${qrToken(4)}`;
-      const passwordHash = await hashPassword(password);
+      const passwordFields = await this.auth.passwordFields(password, actor.name);
       const [existing] = await db.select().from(users).where(eq(users.employeeId, id));
       await this.auth.assertLoginFree({ username: input.username, email: input.email }, { userId: existing?.id, employeeId: id });
 
@@ -289,7 +289,7 @@ export class EmployeesService {
         username = input.username ?? existing.username;
         await db
           .update(users)
-          .set({ passwordHash, email, username, isActive: true, failedLogins: 0, lockedUntil: null, ...(input.roleId ? { roleId } : {}), updatedAt: new Date() })
+          .set({ ...passwordFields, email, username, isActive: true, failedLogins: 0, lockedUntil: null, ...(input.roleId ? { roleId } : {}), updatedAt: new Date() })
           .where(eq(users.id, existing.id));
         await this.auth.revokeUserSessions(existing.id);
       } else {
@@ -298,7 +298,7 @@ export class EmployeesService {
         const [taken] = candidate && !input.email ? await db.select({ id: users.id }).from(users).where(sql`lower(${users.email}) = lower(${candidate})`) : [];
         email = candidate && !taken ? candidate : null;
         username = input.username ?? null;
-        await db.insert(users).values({ email, username, name: emp.fullName, passwordHash, roleId, employeeId: id });
+        await db.insert(users).values({ email, username, name: emp.fullName, ...passwordFields, roleId, employeeId: id });
       }
       await this.history.record(actor, {
         entityType: 'EMPLOYEE',

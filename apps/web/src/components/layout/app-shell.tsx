@@ -9,6 +9,7 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
+  DialogDescription,
   DialogTitle,
   DropdownMenu,
   DropdownMenuContent,
@@ -156,6 +157,7 @@ function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; onOpenCha
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Change password</DialogTitle>
+          <DialogDescription>Your administrator can see this password, so don’t reuse one from another account.</DialogDescription>
         </DialogHeader>
         <form className="grid gap-3" onSubmit={submit}>
           <input className="h-9 rounded-md border bg-card px-3 text-sm" type="password" placeholder="Current password" value={current} onChange={(e) => setCurrent(e.target.value)} autoComplete="current-password" />
