@@ -13,11 +13,12 @@ import {
 } from '@eam/shared';
 import type { Actor } from '../../common/actor';
 import { badRequest, conflict, CurrentActor, likePattern, listParams, notFound, RequirePermissions, ZodPipe } from '../../common/http';
+import { CredentialVault } from '../../core/credential-vault.service';
 import { SequenceService } from '../../core/sequence.service';
 import { DbService } from '../../db/db.service';
 import { employees, roles, users } from '../../db/schema';
 import { diffChanges, HistoryService } from '../../core/history.service';
-import { AuthService, hashPassword } from '../auth/auth.service';
+import { AuthService } from '../auth/auth.service';
 
 const publicUser = {
   id: users.id,
@@ -31,6 +32,8 @@ const publicUser = {
   employeeCode: employees.employeeCode,
   isActive: users.isActive,
   lastLoginAt: users.lastLoginAt,
+  hasSavedPassword: sql<boolean>`${users.passwordSaved} is not null`,
+  passwordSavedAt: users.passwordSavedAt,
   createdAt: users.createdAt,
 };
 
@@ -41,7 +44,23 @@ export class AdminService {
     private readonly history: HistoryService,
     private readonly auth: AuthService,
     private readonly sequences: SequenceService,
+    private readonly vault: CredentialVault,
   ) {}
+
+  /** Shows the saved password of a login. Every look is written to the activity log. */
+  async revealPassword(actor: Actor, id: string) {
+    const [u] = await this.dbs.db
+      .select({ name: users.name, email: users.email, username: users.username, employeeCode: employees.employeeCode, sealed: users.passwordSaved, savedAt: users.passwordSavedAt, savedByName: users.passwordSavedByName })
+      .from(users)
+      .leftJoin(employees, eq(employees.id, users.employeeId))
+      .where(eq(users.id, id));
+    if (!u) throw notFound('User');
+    const password = await this.vault.open(u.sealed);
+    if (password) {
+      await this.history.record(actor, { entityType: 'USER', entityId: id, entityLabel: u.email ?? u.name, action: 'PASSWORD_VIEWED', summary: `Saved password of ${u.name} viewed` });
+    }
+    return { loginId: u.username ?? u.employeeCode ?? u.email, email: u.email, password, savedAt: u.savedAt, savedByName: u.savedByName };
+  }
 
   async listUsers(q: Record<string, string>) {
     const p = listParams(q, { sort: 'name', dir: 'asc' });
@@ -73,7 +92,7 @@ export class AdminService {
       const employeeId = input.employeeId ?? (role.permissions.includes('insights:leadership') ? null : await this.addStaffEmployee(actor, input.name, input.email ?? null, employeeCode ?? null));
       const [row] = await db
         .insert(users)
-        .values({ ...values, employeeId, passwordHash: await hashPassword(input.password) })
+        .values({ ...values, employeeId, ...(await this.auth.passwordFields(input.password, actor.name)) })
         .returning({ id: users.id, name: users.name, email: users.email });
       await this.history.record(actor, { entityType: 'USER', entityId: row.id, entityLabel: row.email ?? row.name, action: 'CREATED', summary: `User ${row.email ?? row.name} created` });
       return row;
@@ -109,7 +128,7 @@ export class AdminService {
       const changes = diffChanges(before, rest, { name: 'Name', username: 'Login ID', email: 'Email', roleId: 'Role', employeeId: 'Linked employee', isActive: 'Active' });
       const patch: Partial<typeof users.$inferInsert> = { ...rest, updatedAt: new Date() };
       if (password) {
-        patch.passwordHash = await hashPassword(password);
+        Object.assign(patch, await this.auth.passwordFields(password, actor.name));
         patch.failedLogins = 0;
         patch.lockedUntil = null;
         changes.push({ field: 'password', label: 'Password', from: '••••', to: 'reset' });
@@ -199,6 +218,11 @@ export class UsersController {
   @Patch(':id')
   update(@CurrentActor() actor: Actor, @Param('id', ParseUUIDPipe) id: string, @Body(new ZodPipe(userUpdateSchema)) body: UserUpdateInput) {
     return this.admin.updateUser(actor, id, body);
+  }
+
+  @Get(':id/password')
+  password(@CurrentActor() actor: Actor, @Param('id', ParseUUIDPipe) id: string) {
+    return this.admin.revealPassword(actor, id);
   }
 }
 
