@@ -19,6 +19,8 @@ interface OpenState {
   /** Existing record to edit, or defaults for a new one. */
   record?: Record<string, any>;
   defaults?: Record<string, any>;
+  /** Changes on every open, so a new form starts empty instead of showing the last one's values. */
+  seq: number;
 }
 
 interface QuickAddApi {
@@ -46,7 +48,7 @@ export function QuickAddProvider({ children }: { children: ReactNode }) {
   const api = useMemo<QuickAddApi>(
     () => ({
       open: (kind, opts) => {
-        setState({ kind, record: opts?.record, defaults: opts?.defaults });
+        setState((prev) => ({ kind, record: opts?.record, defaults: opts?.defaults, seq: (prev?.seq ?? 0) + 1 }));
         setOpen(true);
       },
       close: () => setOpen(false),
@@ -60,17 +62,17 @@ export function QuickAddProvider({ children }: { children: ReactNode }) {
     <QuickAddContext.Provider value={api}>
       {children}
       <Suspense fallback={null}>
-        {state?.kind === 'asset' && <AssetForm key={state.record?.id ?? 'new'} {...props} />}
-        {state?.kind === 'employee' && <EmployeeForm key={state.record?.id ?? 'new'} {...props} />}
-        {state?.kind === 'category' && <CategoryForm key={state.record?.id ?? 'new'} {...props} />}
-        {state?.kind === 'assetType' && <AssetTypeForm key={state.record?.id ?? 'new'} {...props} />}
+        {state?.kind === 'asset' && <AssetForm key={state.record?.id ?? `new-${state.seq}`} {...props} />}
+        {state?.kind === 'employee' && <EmployeeForm key={state.record?.id ?? `new-${state.seq}`} {...props} />}
+        {state?.kind === 'category' && <CategoryForm key={state.record?.id ?? `new-${state.seq}`} {...props} />}
+        {state?.kind === 'assetType' && <AssetTypeForm key={state.record?.id ?? `new-${state.seq}`} {...props} />}
         {(state?.kind === 'department' || state?.kind === 'location' || state?.kind === 'vendor' || state?.kind === 'company') && (
-          <OrgForm key={`${state.kind}-${state.record?.id ?? 'new'}`} kind={state.kind} {...props} />
+          <OrgForm key={`${state.kind}-${state.record?.id ?? state.seq}`} kind={state.kind} {...props} />
         )}
-        {state?.kind === 'request' && <RequestForm key="request" {...props} />}
-        {state?.kind === 'ticket' && <TicketForm key="ticket" {...props} />}
-        {state?.kind === 'maintenance' && <MaintenanceForm key="maintenance" {...props} />}
-        {state?.kind === 'onboarding' && <OnboardingForm key="onboarding" {...props} />}
+        {state?.kind === 'request' && <RequestForm key={`request-${state.seq}`} {...props} />}
+        {state?.kind === 'ticket' && <TicketForm key={`ticket-${state.seq}`} {...props} />}
+        {state?.kind === 'maintenance' && <MaintenanceForm key={`maintenance-${state.seq}`} {...props} />}
+        {state?.kind === 'onboarding' && <OnboardingForm key={`onboarding-${state.seq}`} {...props} />}
       </Suspense>
     </QuickAddContext.Provider>
   );
