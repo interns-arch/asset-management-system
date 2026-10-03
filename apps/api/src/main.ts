@@ -54,9 +54,15 @@ export async function createApp() {
   const webDist = path.resolve(__dirname, '../../web/dist');
   if (existsSync(path.join(webDist, 'index.html'))) {
     // redirect: false — "/assets" is an app route, not the build's assets/ folder.
-    app.useStaticAssets(webDist, { index: false, redirect: false, maxAge: '1h' });
+    // Hashed build files never change; everything else (the page itself, the icon) is re-checked so updates show up.
+    app.useStaticAssets(webDist, {
+      index: false,
+      redirect: false,
+      setHeaders: (res, file) => res.setHeader('Cache-Control', /[\\/]assets[\\/]/.test(file) ? 'public, max-age=31536000, immutable' : 'no-cache'),
+    });
     app.use((req: Request, res: Response, next: NextFunction) => {
       if (req.method !== 'GET' || req.path.startsWith('/api')) return next();
+      res.setHeader('Cache-Control', 'no-cache');
       res.sendFile(path.join(webDist, 'index.html'));
     });
   }
