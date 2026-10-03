@@ -1,4 +1,4 @@
-import { Camera, ChevronLeft, ChevronRight, ImagePlus, X } from 'lucide-react';
+import { Camera, ChevronLeft, ChevronRight, Download, ImagePlus, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/overlays';
@@ -120,6 +120,11 @@ export function PhotoStrip({ photos, className, size = 'md' }: { photos: Allocat
               </DialogHeader>
               <div className="relative">
                 <img src={photoUrl(current)} alt="" className="max-h-[70vh] w-full rounded-lg bg-muted object-contain" />
+                <Button asChild size="sm" variant="secondary" className="absolute right-2 bottom-2 shadow">
+                  <a href={photoUrl(current)} download={`${current.kind.toLowerCase()}-photo-${current.createdAt.slice(0, 10)}-${open! + 1}.jpg`}>
+                    <Download /> Download
+                  </a>
+                </Button>
                 {photos.length > 1 && (
                   <>
                     <Button size="icon-sm" variant="outline" className="absolute top-1/2 left-2 -translate-y-1/2" aria-label="Previous" onClick={() => setOpen((open! - 1 + photos.length) % photos.length)}>

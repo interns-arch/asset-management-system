@@ -28,6 +28,8 @@ export default function EmployeeForm({ open, onOpenChange, record, defaults }: F
   const [access, setAccess] = useState<AccessInput>({ roleId: '', username: '', email: '', password: '' });
   const [accessErrors, setAccessErrors] = useState<Record<string, string>>({});
   const [created, setCreated] = useState<{ fullName: string; credentials: Credentials } | null>(null);
+  // The login ID follows the employee ID until someone types their own (or clears it).
+  const [usernameEdited, setUsernameEdited] = useState(false);
   const setAccessField = (k: keyof AccessInput) => (v: string) => setAccess((a) => ({ ...a, [k]: v }));
   const form = useZodForm(employeeSchema, {
     employeeCode: emp?.employeeCode ?? '',
@@ -50,6 +52,8 @@ export default function EmployeeForm({ open, onOpenChange, record, defaults }: F
       editing ? api.patch<EmployeeDetail>(`/employees/${emp.id}`, body) : api.post<EmployeeDetail & { credentials: Credentials | null }>('/employees', body),
   });
   const e = (n: string) => errorOf(form, n);
+  const employeeCode = ((form.watch('employeeCode') as string) || '').trim().toLowerCase();
+  const username = usernameEdited ? access.username : employeeCode;
   const pick = (name: 'companyId' | 'departmentId' | 'locationId' | 'managerId') => ({
     value: (form.watch(name) as string) || null,
     onChange: (val: string | null) => form.setValue(name, val ?? '', { shouldDirty: true }),
@@ -62,7 +66,7 @@ export default function EmployeeForm({ open, onOpenChange, record, defaults }: F
       return;
     }
     try {
-      const body = canGiveLogin && giveLogin ? { ...values, access: { ...access, email: access.email || values.email || '' } } : values;
+      const body = canGiveLogin && giveLogin ? { ...values, access: { ...access, username: usernameEdited ? access.username : '', email: access.email || values.email || '' } } : values;
       const saved = await save.mutateAsync(body);
       await Promise.all([queryClient.invalidateQueries({ queryKey: ['employees'] }), queryClient.invalidateQueries({ queryKey: ['employee'] })]);
       toast.success(editing ? 'Employee updated' : `${saved.fullName} added`, {
@@ -143,8 +147,17 @@ export default function EmployeeForm({ open, onOpenChange, record, defaults }: F
                 <Field label="Role" required error={accessErrors.roleId} className="sm:col-span-2">
                   <RoleSelect value={access.roleId} onChange={setAccessField('roleId')} />
                 </Field>
-                <Field label="Login ID" error={accessErrors.username} hint="Optional · blank = employee ID">
-                  <Input value={access.username} onChange={(ev) => setAccessField('username')(ev.target.value.replace(/\s/g, ''))} placeholder={(form.watch('employeeCode') as string) || 'amit.kumar'} autoComplete="off" autoCapitalize="none" />
+                <Field label="Login ID" error={accessErrors.username} hint="Filled from the employee ID · change it if you like (blank = employee ID)">
+                  <Input
+                    value={username}
+                    onChange={(ev) => {
+                      setUsernameEdited(true);
+                      setAccessField('username')(ev.target.value.replace(/\s/g, ''));
+                    }}
+                    placeholder="amit.kumar"
+                    autoComplete="off"
+                    autoCapitalize="none"
+                  />
                 </Field>
                 <Field label="Email for sign-in" error={accessErrors.email} hint="Optional · blank = official email">
                   <Input type="email" value={access.email} onChange={(ev) => setAccessField('email')(ev.target.value)} placeholder={(form.watch('email') as string) || 'name@cartrends.in'} autoComplete="off" />
