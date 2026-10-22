@@ -218,14 +218,14 @@ describe('dynamic asset types and custom fields', () => {
   test('assets get a tag from the type prefix and clean attribute values', async () => {
     const r = await newDrone({ attributes: { flight_time_min: '45', camera: '4K', aviation_id: 'AV-100' } });
     assert.equal(r.status, 201);
-    assert.match(r.body.assetTag, /^qdc-\d{3}$/);
+    assert.match(r.body.assetTag, /^QDC-\d{3}$/);
     assert.deepEqual(r.body.attributes, { flight_time_min: 45, camera: '4K', aviation_id: 'AV-100' });
   });
 
   test('unique custom fields reject duplicates', async () => {
     const dup = await newDrone({ attributes: { flight_time_min: 30, aviation_id: 'AV-100' } });
     assert.equal(dup.status, 400);
-    assert.match(dup.body.message, /already used by qdc-/);
+    assert.match(dup.body.message, /already used by QDC-/);
   });
 
   test('catalog and role listings report correct counts', async () => {

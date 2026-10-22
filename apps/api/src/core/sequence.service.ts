@@ -16,8 +16,8 @@ export class SequenceService {
   }
 
   /**
-   * Next asset tag for an asset type code: LAP → lap-013. Continues after the highest number already
-   * used by that type in either style (lap-012 or LAP-000011), so tags renamed by hand never collide.
+   * Next asset tag for an asset type code: LAP → LAP-013. Continues after the highest number already
+   * used by that type in any style (LAP-012, lap-012 or LAP-000011), so tags renamed by hand never collide.
    */
   async nextAssetTag(typeCode: string): Promise<string> {
     const prefix = typeCode.toLowerCase();
@@ -29,6 +29,6 @@ export class SequenceService {
       insert into sequences (prefix, last_value) values (${`asset:${prefix}`}, (select n from used) + 1)
       on conflict (prefix) do update set last_value = greatest(sequences.last_value, (select n from used)) + 1
       returning last_value`);
-    return `${prefix}-${String(result.rows[0].last_value).padStart(3, '0')}`;
+    return `${typeCode.toUpperCase()}-${String(result.rows[0].last_value).padStart(3, '0')}`;
   }
 }
