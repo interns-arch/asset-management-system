@@ -38,6 +38,9 @@ Tracks the build milestones so work can resume after any interruption.
 
 - [x] 17. Joining kit and one-time (no return) items (2026-09-26)
 
+- [x] 18. Live on AWS (port 4009); asset codes LAP-013 / CHG-013 (capitals, 3 digits, continue after the
+       highest used); reconcile the asset register sheet (All Assets) on the Reconciliation page (2026-10-22)
+
 ## Possible next steps
 - AI assistant on top of the permission-checked API (the design already allows it)
 - Email notifications (SMTP) in addition to in-app notifications
