@@ -1,4 +1,4 @@
-import type { ReconStatus } from '@eam/shared';
+import type { ReconSource, ReconStatus } from '@eam/shared';
 import { Badge, type BadgeTone } from '@/components/ui/primitives';
 
 export const STATUS_META: Record<ReconStatus, { label: string; tone: BadgeTone }> = {
@@ -7,6 +7,12 @@ export const STATUS_META: Record<ReconStatus, { label: string; tone: BadgeTone }
   MISSING_IN_SYSTEM: { label: 'Not in system', tone: 'amber' },
   MISSING_IN_DUMP: { label: 'Not in file', tone: 'gray' },
   INVALID: { label: 'Invalid row', tone: 'orange' },
+};
+
+export const SOURCE_BADGE: Record<ReconSource, { label: string; tone: BadgeTone }> = {
+  AIRTEL: { label: 'Airtel', tone: 'red' },
+  SALARYBOX: { label: 'Salary Box', tone: 'violet' },
+  ASSETS: { label: 'Asset sheet', tone: 'blue' },
 };
 
 export function SummaryChips({ summary }: { summary: Record<string, number> }) {

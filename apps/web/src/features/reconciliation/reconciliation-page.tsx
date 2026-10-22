@@ -1,6 +1,6 @@
 import { detectSource, extractRows, RECON_COLUMNS, RECON_SOURCE_LABELS, type ReconSource } from '@eam/shared';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { CardSim, FileSpreadsheet, GitCompareArrows, ShieldCheck, Upload, Users } from 'lucide-react';
+import { Boxes, CardSim, FileSpreadsheet, GitCompareArrows, ShieldCheck, Upload, Users } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner';
@@ -11,7 +11,7 @@ import { api, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { queryClient } from '@/lib/queries';
 import { cn, formatDateTime, relativeTime } from '@/lib/utils';
-import { SummaryChips } from './summary';
+import { SOURCE_BADGE, SummaryChips } from './summary';
 
 export interface ReconRunSummary {
   id: string;
@@ -35,6 +35,7 @@ interface Parsed {
 const SOURCES: { source: ReconSource; icon: typeof CardSim; perm: 'asset:assign' | 'employee:manage'; hint: string }[] = [
   { source: 'AIRTEL', icon: CardSim, perm: 'asset:assign', hint: 'Connections export from the Airtel business portal. Checked against the SIM register.' },
   { source: 'SALARYBOX', icon: Users, perm: 'employee:manage', hint: 'Employee export from Salary Box. Checked against employees and the laptops / SIMs they hold.' },
+  { source: 'ASSETS', icon: Boxes, perm: 'asset:assign', hint: 'Your asset sheet (“All Assets”: Asset code, Category, Assigned to, Assigned on). Checked against the assets in this portal.' },
 ];
 
 async function parseFile(file: File, expected: ReconSource): Promise<Parsed> {
@@ -45,14 +46,20 @@ async function parseFile(file: File, expected: ReconSource): Promise<Parsed> {
   } catch {
     throw new Error('Could not read this file. Save it as an Excel workbook (.xlsx) and try again.');
   }
+  // A workbook can hold several kinds of sheet (the asset sheet sits next to a Salary Box dump): use the one asked for.
+  let other: ReconSource | null = null;
   for (const s of sheets) {
     const found = detectSource(s.data);
     if (!found) continue;
-    if (found.source !== expected) throw new Error(`This looks like a ${RECON_SOURCE_LABELS[found.source]} file — use the other upload button.`);
+    if (found.source !== expected) {
+      other ??= found.source;
+      continue;
+    }
     const { rows, repaired, missingColumns } = extractRows(s.data, found.source, found.headerRow);
     if (!rows.length) throw new Error('No data rows found under the header.');
     return { source: found.source, fileName: file.name, sheet: s.sheet, rows, repaired, missingColumns };
   }
+  if (other) throw new Error(`This looks like a ${RECON_SOURCE_LABELS[other]} file — use that upload button.`);
   throw new Error(`Could not find the ${RECON_SOURCE_LABELS[expected]} header row (e.g. “${RECON_COLUMNS[expected][0].label}”) in any sheet.`);
 }
 
@@ -88,9 +95,9 @@ export default function ReconciliationPage() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Reconciliation" description="Upload the latest Airtel or Salary Box dump. Every upload is checked against this system and the team gets a notification with the result." />
+      <PageHeader title="Reconciliation" description="Upload the latest Airtel or Salary Box dump, or your asset sheet. Every upload is checked against this system and the team gets a notification with the result." />
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {SOURCES.filter((s) => can(s.perm)).map((s) => (
           <Card key={s.source}>
             <CardHeader>
@@ -178,7 +185,7 @@ export default function ReconciliationPage() {
                 <button type="button" onClick={() => navigate(`/reconciliation/${r.id}`)} className="flex w-full cursor-pointer flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 text-left transition hover:bg-muted/50">
                   <div className="min-w-48 flex-1">
                     <div className="flex items-center gap-2 font-medium">
-                      <Badge tone={r.source === 'AIRTEL' ? 'red' : 'violet'}>{r.source === 'AIRTEL' ? 'Airtel' : 'Salary Box'}</Badge>
+                      <Badge tone={SOURCE_BADGE[r.source].tone}>{SOURCE_BADGE[r.source].label}</Badge>
                       <span className="truncate">{r.fileName}</span>
                     </div>
                     <div className="text-xs text-muted-foreground" title={formatDateTime(r.createdAt)}>

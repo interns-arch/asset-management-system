@@ -107,6 +107,27 @@ test('reconcile: detects the source and joins rows split by line breaks', async 
   assert.ok(!JSON.stringify(rows).includes('123412341234'));
 });
 
+test('reconcile: the asset sheet is found next to other sheets and rows are not joined', async () => {
+  const { assetCodeKey, detectSource, extractRows, sheetDay } = await import('./reconcile');
+  const table: unknown[][] = [
+    ['Asset code', 'Asset Category', 'Assigned to', 'Extra info ignore', 'Assigned on', 'Checked on'],
+    ['LAP-007', 'Laptop', 'Rahul Bhandari', '84137F9C-E9D6-4FA1-A621-52DDA6672AE4', '01/10/26', '22/10/26'],
+    [null, 'Mouse', null],
+    ['CHG-007', 'Laptop Charger', 'Rahul Bhandari', null, new Date('2026-10-01T00:00:00Z')],
+  ];
+  const found = detectSource(table)!;
+  assert.deepEqual(found, { source: 'ASSETS', headerRow: 0 });
+  const { rows, repaired } = extractRows(table, found.source, found.headerRow);
+  assert.equal(repaired, 0);
+  assert.deepEqual(rows[0], { assetCode: 'LAP-007', category: 'Laptop', assignedTo: 'Rahul Bhandari', assignedOn: '01/10/26' });
+  assert.equal(rows[1].assetCode, 'CHG-007');
+  // Extra info is not one of the columns sent.
+  assert.ok(!JSON.stringify(rows).includes('84137F9C'));
+  assert.equal(sheetDay('01/10/26'), '2026-10-01');
+  assert.equal(sheetDay(rows[1].assignedOn), '2026-10-01');
+  assert.equal(assetCodeKey('lap-7'), assetCodeKey('LAP-000007'));
+});
+
 test('reconcile: identifiers and employee codes are normalised', async () => {
   const { employeeCodeKey, extractIdentifiers, normalizeIccid } = await import('./reconcile');
   assert.equal(employeeCodeKey('CT0000122'), employeeCodeKey('CT000122'));

@@ -741,6 +741,39 @@ describe('reconciliation', () => {
     const [raw] = (await dbs.root.execute<{ items: unknown }>(sql`select items from reconciliation_runs where id = ${stored.body.id}`)).rows;
     assert.ok(!JSON.stringify(raw).includes('123412341234'));
   });
+
+  test('the asset sheet is matched to assets by code, holder and date', async () => {
+    const cat = await call('POST', '/categories', { name: 'Office', code: 'OFC' });
+    const type = await call('POST', '/asset-types', { categoryId: cat.body.id, name: 'Projector', code: 'PRJ', trackingMode: 'INDIVIDUAL' });
+    const one = await call('POST', '/assets', { assetTypeId: type.body.id, name: 'Epson', status: 'AVAILABLE' });
+    await call('POST', '/assets', { assetTypeId: type.body.id, name: 'BenQ', status: 'AVAILABLE' });
+    assert.equal(one.body.assetTag, 'PRJ-001');
+    await call('POST', `/assets/${one.body.id}/assign`, { holderType: 'EMPLOYEE', holderId: ids.alice });
+    const today = new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10);
+    const ddmmyy = `${today.slice(8, 10)}/${today.slice(5, 7)}/${today.slice(2, 4)}`;
+    const rows = [
+      { assetCode: 'prj-1', category: 'Projector', assignedTo: 'alice rao', assignedOn: ddmmyy },
+      { assetCode: 'PRJ-002', category: 'Projector', assignedTo: 'Alice Rao', assignedOn: ddmmyy },
+      { assetCode: 'PRJ-999', category: 'Projector', assignedTo: null },
+      { assetCode: 'PRJ-002', category: 'Projector', assignedTo: null },
+    ];
+    assert.equal((await call('POST', '/reconciliations', { source: 'ASSETS', fileName: 'assets.xlsx', rows }, 'bob')).status, 403);
+    const res = await call('POST', '/reconciliations', { source: 'ASSETS', fileName: 'assets.xlsx', rows }, 'it');
+    assert.equal(res.status, 201);
+    const run = await call('GET', `/reconciliations/${res.body.id}`, undefined, 'it');
+    const byKey = (k: string) => run.body.items.filter((i: { key: string }) => i.key === k);
+    // Same asset, code written in another style: matched, with a note.
+    assert.equal(byKey('PRJ-001')[0].status, 'MATCHED');
+    assert.deepEqual(byKey('PRJ-001')[0].issues.map((x: { field: string }) => x.field), ['assetCode']);
+    // The sheet gives it to Alice; the portal has it in stock.
+    assert.equal(byKey('PRJ-002')[0].status, 'MISMATCH');
+    assert.equal(byKey('PRJ-002')[1].status, 'INVALID');
+    assert.equal(byKey('PRJ-999')[0].status, 'MISSING_IN_SYSTEM');
+    // Assets the sheet does not list are reported, except SIMs (checked against Airtel).
+    const notInSheet = run.body.items.filter((i: { status: string }) => i.status === 'MISSING_IN_DUMP');
+    assert.ok(notInSheet.length >= 1);
+    assert.ok(!notInSheet.some((i: { key: string }) => i.key.startsWith('SIM')));
+  });
 });
 
 describe('history', () => {

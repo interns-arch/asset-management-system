@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { desc, eq, ilike, inArray, ne } from 'drizzle-orm';
 import {
+  assetCodeKey,
   assetCreateSchema,
+  ASSET_STATUS_LABELS,
   type DumpRow,
   employeeCodeKey,
   extractIdentifiers,
@@ -13,6 +15,7 @@ import {
   type ReconSource,
   type ReconStatus,
   type ReconUploadInput,
+  sheetDay,
 } from '@eam/shared';
 import { type Actor, assertCan, can } from '../../common/actor';
 import { badRequest, notFound } from '../../common/http';
@@ -41,7 +44,7 @@ export interface ReconItem {
   addSim?: { connectionNumber: string; simNumber: string | null; plan: string | null; circle: string | null; billableId: string | null; employeeId: string | null; employeeName: string | null };
 }
 
-const PERMISSION: Record<ReconSource, 'asset:assign' | 'employee:manage'> = { AIRTEL: 'asset:assign', SALARYBOX: 'employee:manage' };
+const PERMISSION: Record<ReconSource, 'asset:assign' | 'employee:manage'> = { AIRTEL: 'asset:assign', SALARYBOX: 'employee:manage', ASSETS: 'asset:assign' };
 const same = (a: string | null | undefined, b: string | null | undefined) => normalizeText(a) === normalizeText(b);
 const stripCode = (holder: string | null) => (holder ?? '').replace(/\s*\([^)]*\)\s*$/, '');
 
@@ -56,7 +59,14 @@ type AssetRow = {
   holderName: string | null;
   attributes: Record<string, unknown>;
   typeCode: string;
+  typeName: string;
+  trackingMode: string;
+  assignedAt: Date | null;
 };
+
+/** The calendar day in India (where the sheet is kept) of a moment, as YYYY-MM-DD. */
+const indiaDay = (d: Date | null) => (d ? new Date(d.getTime() + 330 * 60_000).toISOString().slice(0, 10) : null);
+const ddmmyy = (day: string | null) => (day ? `${day.slice(8, 10)}/${day.slice(5, 7)}/${day.slice(2, 4)}` : null);
 
 function summarise(items: ReconItem[]) {
   const summary: Record<string, number> = { MATCHED: 0, MISMATCH: 0, MISSING_IN_SYSTEM: 0, MISSING_IN_DUMP: 0, INVALID: 0, warnings: 0 };
@@ -110,7 +120,12 @@ export class ReconciliationService {
     const keys = RECON_COLUMNS[input.source].map((c) => c.key);
     const rows: DumpRow[] = input.rows.map((r) => Object.fromEntries(keys.map((k) => [k, r[k] ?? null])));
     const assetRows = await this.loadAssets();
-    const items = input.source === 'AIRTEL' ? this.airtel(rows, assetRows, await this.loadEmployees()) : this.salaryBox(rows, assetRows, await this.loadEmployees());
+    const items =
+      input.source === 'ASSETS'
+        ? this.assetSheet(rows, assetRows)
+        : input.source === 'AIRTEL'
+          ? this.airtel(rows, assetRows, await this.loadEmployees())
+          : this.salaryBox(rows, assetRows, await this.loadEmployees());
 
     const summary = summarise(items);
     const [run] = await this.dbs.db
@@ -187,6 +202,9 @@ export class ReconciliationService {
         holderName: assets.holderName,
         attributes: assets.attributes,
         typeCode: assetTypes.code,
+        typeName: assetTypes.name,
+        trackingMode: assets.trackingMode,
+        assignedAt: assets.assignedAt,
       })
       .from(assets)
       .innerJoin(assetTypes, eq(assetTypes.id, assets.assetTypeId))
@@ -437,6 +455,76 @@ export class ReconciliationService {
     for (const p of people) {
       if (matched.has(p.id) || p.status === 'EXITED' || p.status === 'JOINING') continue;
       items.push({ status: 'MISSING_IN_DUMP', key: p.code, title: p.fullName, subtitle: `${p.code} · in our employees but not in Salary Box`, entity: { kind: 'EMPLOYEE', id: p.id, label: `${p.fullName} (${p.code})` }, issues: [] });
+    }
+    return items;
+  }
+
+  // ─── Asset register sheet: one row per asset code, matched to the asset with that tag ─
+  private assetSheet(rows: DumpRow[], allAssets: AssetRow[]): ReconItem[] {
+    const byCode = new Map<string, AssetRow>();
+    for (const a of allAssets) {
+      const k = assetCodeKey(a.assetTag);
+      if (k) byCode.set(k, a);
+    }
+    const items: ReconItem[] = [];
+    const seen = new Set<string>();
+    const matched = new Set<string>();
+    for (const row of rows) {
+      const code = (row.assetCode ?? '').trim();
+      const key = assetCodeKey(code) ?? code;
+      const subtitle = [row.category, row.assignedTo].filter(Boolean).join(' · ') || null;
+      if (seen.has(key)) {
+        items.push({ status: 'INVALID', key: code, title: code, subtitle: `Listed more than once in the sheet${subtitle ? ` · ${subtitle}` : ''}`, entity: null, issues: [] });
+        continue;
+      }
+      seen.add(key);
+      const asset = byCode.get(key);
+      if (!asset) {
+        items.push({ status: 'MISSING_IN_SYSTEM', key: code, title: code, subtitle: `Not in the portal${subtitle ? ` · ${subtitle}` : ''}`, entity: null, issues: [] });
+        continue;
+      }
+      matched.add(asset.id);
+
+      const issues: ReconIssue[] = [];
+      if (code !== asset.assetTag) issues.push({ field: 'assetCode', label: 'Code written differently', dump: code, system: asset.assetTag, level: 'warning' });
+      // The sheet says "Laptop Charger" where the type is "Charger", or the item ("Laptop Stand") for a custom type.
+      const category = normalizeText(row.category);
+      const fits = (n: string) => {
+        const t = normalizeText(n);
+        return t !== '' && (category.includes(t) || t.includes(category));
+      };
+      if (category && !fits(asset.typeName) && !fits(asset.name)) issues.push({ field: 'category', label: 'Category', dump: row.category, system: asset.typeName, level: 'warning' });
+
+      const holder = asset.holderName ? stripCode(asset.holderName) : null;
+      const notAssigned = `Not assigned (${ASSET_STATUS_LABELS[asset.status as keyof typeof ASSET_STATUS_LABELS] ?? asset.status})`;
+      if (row.assignedTo && !holder) issues.push({ field: 'holder', label: 'Assigned to', dump: row.assignedTo, system: notAssigned, level: 'error' });
+      else if (!row.assignedTo && holder) issues.push({ field: 'holder', label: 'Assigned to', dump: null, system: asset.holderName, level: 'error' });
+      else if (row.assignedTo && !same(row.assignedTo, holder)) issues.push({ field: 'holder', label: 'Assigned to', dump: row.assignedTo, system: asset.holderName, level: 'error' });
+
+      const sheetOn = sheetDay(row.assignedOn);
+      const portalOn = indiaDay(asset.assignedAt);
+      if (row.assignedOn && holder && sheetOn !== portalOn) issues.push({ field: 'assignedOn', label: 'Assigned on', dump: ddmmyy(sheetOn) ?? row.assignedOn, system: ddmmyy(portalOn), level: 'warning' });
+
+      items.push({
+        status: issues.some((i) => i.level === 'error') ? 'MISMATCH' : 'MATCHED',
+        key: asset.assetTag,
+        title: asset.assetTag,
+        subtitle: `${asset.name} · ${asset.holderName ?? notAssigned}`,
+        entity: { kind: 'ASSET', id: asset.id, label: `${asset.assetTag} · ${asset.holderName ?? 'Not assigned'}` },
+        issues,
+      });
+    }
+    // The sheet lists individual items; SIMs are checked against Airtel and pooled stock is counted, not listed.
+    for (const a of allAssets) {
+      if (matched.has(a.id) || a.typeCode === 'SIM' || a.trackingMode === 'QUANTITY' || ['LOST', 'RETIRED'].includes(a.status)) continue;
+      items.push({
+        status: 'MISSING_IN_DUMP',
+        key: a.assetTag,
+        title: a.assetTag,
+        subtitle: `${a.name} · ${a.holderName ?? 'Not assigned'} · in the portal but not in the sheet`,
+        entity: { kind: 'ASSET', id: a.id, label: `${a.assetTag} · ${a.holderName ?? 'Not assigned'}` },
+        issues: [],
+      });
     }
     return items;
   }

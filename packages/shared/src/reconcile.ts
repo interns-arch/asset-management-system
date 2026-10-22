@@ -1,13 +1,14 @@
 import { z } from 'zod';
 
 /**
- * Reconciliation of third-party dumps (Airtel connections, Salary Box employees) against the register.
+ * Reconciliation of third-party dumps (Airtel connections, Salary Box employees, the team's own asset
+ * register sheet) against the register.
  * Parsing runs in the browser so only the columns below ever reach the server — Aadhaar, PAN, bank
  * details and addresses in a Salary Box export stay on the uploader's computer.
  */
-export const RECON_SOURCES = ['AIRTEL', 'SALARYBOX'] as const;
+export const RECON_SOURCES = ['AIRTEL', 'SALARYBOX', 'ASSETS'] as const;
 export type ReconSource = (typeof RECON_SOURCES)[number];
-export const RECON_SOURCE_LABELS: Record<ReconSource, string> = { AIRTEL: 'Airtel connections', SALARYBOX: 'Salary Box employees' };
+export const RECON_SOURCE_LABELS: Record<ReconSource, string> = { AIRTEL: 'Airtel connections', SALARYBOX: 'Salary Box employees', ASSETS: 'Asset register sheet' };
 
 export const RECON_STATUSES = ['MATCHED', 'MISMATCH', 'MISSING_IN_SYSTEM', 'MISSING_IN_DUMP', 'INVALID'] as const;
 export type ReconStatus = (typeof RECON_STATUSES)[number];
@@ -47,12 +48,23 @@ const SALARYBOX_COLUMNS: ColumnSpec[] = [
   { key: 'other', label: 'Other', aliases: ['other', 'other assets'] },
 ];
 
-export const RECON_COLUMNS: Record<ReconSource, ColumnSpec[]> = { AIRTEL: AIRTEL_COLUMNS, SALARYBOX: SALARYBOX_COLUMNS };
+const ASSETS_COLUMNS: ColumnSpec[] = [
+  { key: 'assetCode', label: 'Asset code', aliases: ['asset code', 'asset tag'] },
+  { key: 'category', label: 'Asset Category', aliases: ['asset category', 'category', 'asset type'] },
+  { key: 'assignedTo', label: 'Assigned to', aliases: ['assigned to', 'holder'] },
+  { key: 'assignedOn', label: 'Assigned on', aliases: ['assigned on', 'assigned date'] },
+];
 
-/** A record starts on a row whose key cell looks like this; other rows are wrapped continuations. */
-const RECORD_KEY: Record<ReconSource, { key: string; test: (v: string) => boolean }> = {
-  AIRTEL: { key: 'connectionNumber', test: (v) => /\d{10}/.test(v.replace(/\D/g, '')) },
-  SALARYBOX: { key: 'salaryBoxId', test: (v) => /^SB[A-Z0-9]{6,}$/i.test(v.trim()) },
+export const RECON_COLUMNS: Record<ReconSource, ColumnSpec[]> = { AIRTEL: AIRTEL_COLUMNS, SALARYBOX: SALARYBOX_COLUMNS, ASSETS: ASSETS_COLUMNS };
+
+/**
+ * A record starts on a row whose key cell looks like this. In exports (`stitch`), other rows are
+ * wrapped continuations; in a hand-kept sheet they are just rows without a code and are skipped.
+ */
+const RECORD_KEY: Record<ReconSource, { key: string; test: (v: string) => boolean; stitch: boolean }> = {
+  AIRTEL: { key: 'connectionNumber', test: (v) => /\d{10}/.test(v.replace(/\D/g, '')), stitch: true },
+  SALARYBOX: { key: 'salaryBoxId', test: (v) => /^SB[A-Z0-9]{6,}$/i.test(v.trim()), stitch: true },
+  ASSETS: { key: 'assetCode', test: (v) => v.trim() !== '', stitch: false },
 };
 
 const normHeader = (h: unknown) =>
@@ -93,6 +105,7 @@ export function detectSource(table: unknown[][]): { source: ReconSource; headerR
     const names = (table[r] ?? []).map(normHeader);
     if (names.includes('salarybox id') || names.includes('salary box id')) return { source: 'SALARYBOX', headerRow: r };
     if (names.includes('connection number') && names.includes('sim number')) return { source: 'AIRTEL', headerRow: r };
+    if ((names.includes('asset code') || names.includes('asset tag')) && names.includes('assigned to')) return { source: 'ASSETS', headerRow: r };
   }
   return null;
 }
@@ -144,7 +157,7 @@ export function extractRows(table: unknown[][], source: ReconSource, headerRow: 
       last = breakPoint(current);
       continue;
     }
-    if (!current || last < 0) continue;
+    if (!current || last < 0 || !RECORD_KEY[source].stitch) continue;
     repaired++;
     const cont = lastFilled(row);
     const head = cellText(row[0]);
@@ -180,6 +193,22 @@ export const employeeCodeKey = (v: string | null | undefined) => {
   return m ? `${m[1]}${m[2]}` : (v ?? '').trim().toUpperCase() || null;
 };
 export const normalizeText = (v: string | null | undefined) => (v ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+/** LAP-007, lap-7 and LAP-000007 compare equal. */
+export const assetCodeKey = (v: string | null | undefined) => {
+  const s = (v ?? '').trim().toUpperCase();
+  const m = s.match(/^([A-Z]+)[-_ ]?0*(\d+)$/);
+  return m ? `${m[1]}-${m[2]}` : s || null;
+};
+/** A day as YYYY-MM-DD from a sheet cell: ISO dates (Excel date cells) or DD/MM/YY(YY) text. */
+export function sheetDay(v: string | null | undefined): string | null {
+  const s = (v ?? '').trim();
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const dmy = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{2}|\d{4})$/);
+  if (!dmy) return null;
+  const year = dmy[3].length === 2 ? `20${dmy[3]}` : dmy[3];
+  return `${year}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+}
 
 /** Identifiers an employee has written against their assets (laptop, SIM, charger, other). */
 export function extractIdentifiers(text: string | null | undefined) {

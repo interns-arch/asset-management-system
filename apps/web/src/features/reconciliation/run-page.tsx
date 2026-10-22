@@ -152,7 +152,7 @@ export default function ReconRunPage() {
         <div className="border-b p-3">
           <div className="relative max-w-md">
             <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={run.source === 'AIRTEL' ? 'Search number, plan, person…' : 'Search name, employee ID, asset…'} className="pl-8" />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={run.source === 'AIRTEL' ? 'Search number, plan, person…' : run.source === 'ASSETS' ? 'Search asset code, item, person…' : 'Search name, employee ID, asset…'} className="pl-8" />
           </div>
         </div>
         {!items.length ? (
