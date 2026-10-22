@@ -440,7 +440,7 @@ export class AssetsService {
         throw badRequest('Only available assets can be assigned. Set the status to Available.', { status: 'Must be Available to assign' });
       }
       const quantity = pooled ? input.quantity : 1;
-      const assetTag = await this.sequences.next(type.code, 6);
+      const assetTag = await this.sequences.nextAssetTag(type.code);
 
       const { assignTo, status: _s, quantity: _q, attributes: _a, assetTypeId: _t, ...core } = input;
       const [asset] = await db

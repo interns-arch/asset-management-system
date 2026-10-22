@@ -218,14 +218,14 @@ describe('dynamic asset types and custom fields', () => {
   test('assets get a tag from the type prefix and clean attribute values', async () => {
     const r = await newDrone({ attributes: { flight_time_min: '45', camera: '4K', aviation_id: 'AV-100' } });
     assert.equal(r.status, 201);
-    assert.match(r.body.assetTag, /^QDC-\d{6}$/);
+    assert.match(r.body.assetTag, /^qdc-\d{3}$/);
     assert.deepEqual(r.body.attributes, { flight_time_min: 45, camera: '4K', aviation_id: 'AV-100' });
   });
 
   test('unique custom fields reject duplicates', async () => {
     const dup = await newDrone({ attributes: { flight_time_min: 30, aviation_id: 'AV-100' } });
     assert.equal(dup.status, 400);
-    assert.match(dup.body.message, /already used by QDC-/);
+    assert.match(dup.body.message, /already used by qdc-/);
   });
 
   test('catalog and role listings report correct counts', async () => {
@@ -709,7 +709,7 @@ describe('reconciliation', () => {
     assert.equal(item.entity.kind, 'ASSET');
     assert.equal(item.addSim, undefined);
     const held = await call('GET', `/employees/${emp.body.id}`);
-    assert.ok(held.body.assets.some((a: { assetTag: string }) => a.assetTag.startsWith('SIM-')));
+    assert.ok(held.body.assets.some((a: { assetTag: string }) => a.assetTag.toLowerCase().startsWith('sim-')));
 
     // The next upload matches the SIM record directly.
     const second = await call('POST', '/reconciliations', { source: 'AIRTEL', fileName: 'airtel.xlsx', rows }, 'it');
