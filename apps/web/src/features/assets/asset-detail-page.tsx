@@ -22,7 +22,7 @@ import { Barcode, QRCode, useQrLinks } from '@/components/common/codes';
 import { AttributeList } from '@/components/common/dynamic-fields';
 import { DetailList, EmptyState, ErrorState, PageLoader } from '@/components/common/page';
 import { Timeline } from '@/components/common/timeline';
-import { PhotoStrip } from '@/components/common/photos';
+import { AddPhotosButton, PhotoStrip } from '@/components/common/photos';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -77,6 +77,7 @@ export default function AssetDetailPage() {
     else setDialog({ kind: 'lifecycle', asset: actionAsset, action });
   };
 
+  const canAddPhotos = can('asset:create') || can('asset:edit');
   const stageIndex = LIFECYCLE_STAGES.findIndex((s) => s.statuses.includes(a.status));
   const warrantyDays = daysUntil(a.warrantyExpiry);
 
@@ -254,7 +255,20 @@ export default function AssetDetailPage() {
                   },
                   { label: 'Added', value: formatDate(a.createdAt) },
                   ...(a.description ? [{ label: 'Notes', value: a.description, full: true }] : []),
-                  ...(a.photos.length ? [{ label: 'Photos', value: <PhotoStrip photos={a.photos} />, full: true }] : []),
+                  ...(a.photos.length || canAddPhotos
+                    ? [
+                        {
+                          label: 'Photos',
+                          value: (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <PhotoStrip photos={a.photos} />
+                              {canAddPhotos && <AddPhotosButton assetId={a.id} />}
+                            </div>
+                          ),
+                          full: true,
+                        },
+                      ]
+                    : []),
                 ]}
               />
             </CardContent>

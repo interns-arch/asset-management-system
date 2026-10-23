@@ -1,8 +1,10 @@
-import { Camera, ChevronLeft, ChevronRight, Download, ImagePlus, X } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { Camera, ChevronLeft, ChevronRight, Download, ImagePlus, Loader2, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/overlays';
-import { api } from '@/lib/api';
+import { api, errorMessage } from '@/lib/api';
 import type { AllocationPhoto } from '@/lib/types';
 import { cn, formatDateTime } from '@/lib/utils';
 
@@ -79,6 +81,41 @@ export function PhotoPicker({ files, onChange, hint }: { files: File[]; onChange
       </div>
       <p className="mt-1.5 text-xs text-muted-foreground">{hint ?? `Optional · up to ${MAX_PHOTOS} photos of the asset's condition`}</p>
     </div>
+  );
+}
+
+/** Adds photos to an existing asset straight from the camera or gallery. */
+export function AddPhotosButton({ assetId }: { assetId: string }) {
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  return (
+    <Button asChild size="sm" variant="outline" disabled={busy}>
+      <label className={cn('cursor-pointer', busy && 'pointer-events-none opacity-60')}>
+        {busy ? <Loader2 className="animate-spin" /> : <ImagePlus />} {busy ? 'Uploading…' : 'Add photos'}
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          className="sr-only"
+          onChange={async (e) => {
+            const picked = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith('image/') || !f.type);
+            e.target.value = '';
+            if (!picked.length) return;
+            setBusy(true);
+            try {
+              for (let i = 0; i < picked.length; i += MAX_PHOTOS) await uploadPhotos(assetId, null, 'ASSET', picked.slice(i, i + MAX_PHOTOS));
+              toast.success(`${picked.length} photo${picked.length > 1 ? 's' : ''} added`);
+            } catch (err) {
+              toast.error(`Photos did not upload: ${errorMessage(err)}`);
+            } finally {
+              setBusy(false);
+              void qc.invalidateQueries({ queryKey: ['asset', assetId] });
+              void qc.invalidateQueries({ queryKey: ['history', 'asset', assetId] });
+            }
+          }}
+        />
+      </label>
+    </Button>
   );
 }
 

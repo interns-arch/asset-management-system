@@ -41,6 +41,8 @@ Tracks the build milestones so work can resume after any interruption.
 - [x] 18. Live on AWS (port 4009); asset codes LAP-013 / CHG-013 (capitals, 3 digits, continue after the
        highest used); reconcile the asset register sheet (All Assets) on the Reconciliation page (2026-10-22)
 
+- [x] 19. "Add photos" on the asset page — add asset photos any time after the asset is created (2026-10-23)
+
 ## Possible next steps
 - AI assistant on top of the permission-checked API (the design already allows it)
 - Email notifications (SMTP) in addition to in-app notifications
