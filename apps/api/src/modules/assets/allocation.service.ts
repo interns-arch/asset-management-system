@@ -78,6 +78,7 @@ export class AllocationService {
         assignedByName: actor.name,
         expectedReturnDate: expectedReturnDate ?? null,
         notes: notes ?? null,
+        acceptance: holder.holderType === 'EMPLOYEE' ? ('PENDING' as const) : null,
       })
       .returning();
     return alloc;
@@ -370,6 +371,46 @@ export class AllocationService {
     return updated;
   }
 
+  /** The person an item was assigned to confirms they received it; whoever assigned it is told. */
+  async accept(actor: Actor, allocationId: string) {
+    const db = this.dbs.db;
+    const [row] = await db
+      .select({ alloc: allocations, assetTag: assets.assetTag, assetName: assets.name })
+      .from(allocations)
+      .innerJoin(assets, eq(assets.id, allocations.assetId))
+      .where(eq(allocations.id, allocationId));
+    if (!row || !actor.employeeId || row.alloc.employeeId !== actor.employeeId) throw notFound('Assignment');
+    const { alloc } = row;
+    if (alloc.acceptance === 'ACCEPTED') return alloc;
+    if (alloc.acceptance !== 'PENDING' || (alloc.status !== 'ACTIVE' && alloc.status !== 'CONSUMED')) {
+      throw conflict('This assignment is no longer waiting for you to accept it');
+    }
+    const [updated] = await db
+      .update(allocations)
+      .set({ acceptance: 'ACCEPTED', acceptedAt: new Date() })
+      .where(and(eq(allocations.id, alloc.id), eq(allocations.acceptance, 'PENDING')))
+      .returning();
+    if (!updated) return alloc;
+    await this.history.record(actor, {
+      entityType: 'ASSET',
+      entityId: alloc.assetId,
+      entityLabel: `${row.assetTag} · ${row.assetName}`,
+      action: 'ASSIGNMENT_ACCEPTED',
+      summary: `${alloc.holderName} accepted ${row.assetTag}${alloc.quantity > 1 ? ` (qty ${alloc.quantity})` : ''}`,
+      employeeId: alloc.employeeId,
+      metadata: { allocationId: alloc.id },
+    });
+    if (alloc.assignedBy) {
+      await this.notifications.notifyUsers([alloc.assignedBy], {
+        type: 'ASSIGNMENT_ACCEPTED',
+        title: `${alloc.holderName} accepted ${row.assetName}`,
+        body: row.assetTag,
+        link: `/assets/${alloc.assetId}`,
+      });
+    }
+    return updated;
+  }
+
   /** New assignment to an employee: notify them, and add it to their open exit checklist if any. */
   private async afterNewEmployeeHolder(actor: Actor, asset: AssetRow, holder: ResolvedHolder, alloc: AllocationRow, consumed = false) {
     const employeeId = holder.columns.employeeId;
@@ -377,9 +418,10 @@ export class AllocationService {
     const db = this.dbs.db;
     await this.notifications.notifyEmployee(employeeId, {
       type: 'ASSET_ASSIGNED',
-      title: consumed ? `${asset.name} given to you` : `${asset.name} assigned to you`,
-      body: `${asset.assetTag}${alloc.quantity > 1 ? ` · qty ${alloc.quantity}` : ''}`,
-      link: `/assets/${asset.id}`,
+      title: consumed ? `${asset.name} given to you — please accept` : `${asset.name} assigned to you — please accept`,
+      body: `${asset.assetTag}${alloc.quantity > 1 ? ` · qty ${alloc.quantity}` : ''} · tap to confirm you received it`,
+      // A given (one-time) item is not viewable on its asset page; it is accepted from the home page.
+      link: consumed ? '/' : `/assets/${asset.id}`,
     });
     // Nothing to recover later for a one-time item.
     if (consumed) return;

@@ -41,6 +41,7 @@ import { AssetIcon } from '@/lib/icons';
 import { MAINTENANCE_TONE } from '@/lib/status';
 import type { Allocation, AssetDetail, HistoryEvent, MaintenanceRecord } from '@/lib/types';
 import { cn, daysUntil, formatDate, formatDateTime, formatMoney, relativeTime } from '@/lib/utils';
+import { AcceptanceBadge, AcceptButton } from './acceptance';
 import { AssetActionDialog, type AssetDialog } from './asset-actions';
 
 const PRIMARY: LifecycleAction[] = ['assign', 'transfer', 'return'];
@@ -48,7 +49,7 @@ const PRIMARY: LifecycleAction[] = ['assign', 'transfer', 'return'];
 export default function AssetDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { can } = useAuth();
+  const { can, me } = useAuth();
   const quickAdd = useQuickAdd();
   const [dialog, setDialog] = useState<AssetDialog | null>(null);
   const [copied, setCopied] = useState(false);
@@ -78,6 +79,7 @@ export default function AssetDetailPage() {
   };
 
   const canAddPhotos = can('asset:create') || can('asset:edit');
+  const mine = a.activeAllocations.filter((al) => al.acceptance === 'PENDING' && !!me?.employee && al.employeeId === me.employee.id);
   const stageIndex = LIFECYCLE_STAGES.findIndex((s) => s.statuses.includes(a.status));
   const warrantyDays = daysUntil(a.warrantyExpiry);
 
@@ -159,6 +161,15 @@ export default function AssetDetailPage() {
           </div>
         </div>
       </div>
+
+      {mine.map((al) => (
+        <div key={al.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+          <span className="min-w-0 flex-1 text-sm">
+            <span className="font-medium">This was assigned to you{al.quantity > 1 ? ` (×${al.quantity})` : ''}.</span> Please confirm you received it.
+          </span>
+          <AcceptButton allocationId={al.id} assetName={a.name} />
+        </div>
+      ))}
 
       {/* Alerts */}
       {a.openExits.map((x) => (
@@ -326,6 +337,7 @@ export default function AssetDetailPage() {
                             <p className="text-xs text-muted-foreground">
                               ×{al.quantity} · since {formatDate(al.assignedAt)}
                             </p>
+                            <AcceptanceBadge allocation={al} />
                             <PhotoStrip photos={al.photos} size="sm" className="mt-1" />
                           </div>
                           {can('asset:assign') && (
@@ -364,6 +376,7 @@ export default function AssetDetailPage() {
                         items={[
                           { label: 'Since', value: `${formatDateTime(al.assignedAt)} (${relativeTime(al.assignedAt)})` },
                           { label: 'By', value: al.assignedByName },
+                          ...(al.acceptance ? [{ label: 'Acceptance', value: <AcceptanceBadge allocation={al} /> }] : []),
                           ...(al.expectedReturnDate ? [{ label: 'Expected back', value: formatDate(al.expectedReturnDate) }] : []),
                           ...(al.notes ? [{ label: 'Notes', value: al.notes }] : []),
                         ]}
@@ -437,6 +450,11 @@ function AllocationHistory({ assetId }: { assetId: string }) {
             <TD>
               <HolderLabel type={al.holderType} name={al.holderName} />
               {al.quantity > 1 && <span className="ml-1 text-xs text-muted-foreground">×{al.quantity}</span>}
+              {al.acceptance && (
+                <div className="mt-1">
+                  <AcceptanceBadge allocation={al} />
+                </div>
+              )}
             </TD>
             <TD className="whitespace-nowrap text-muted-foreground">{formatDate(al.assignedAt)}</TD>
             <TD className="whitespace-nowrap text-muted-foreground">{al.endedAt ? formatDate(al.endedAt) : '—'}</TD>

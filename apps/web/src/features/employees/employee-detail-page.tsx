@@ -49,6 +49,7 @@ import { useAuth } from '@/lib/auth';
 import { AssetIcon } from '@/lib/icons';
 import { invalidateAssetData, queryClient } from '@/lib/queries';
 import { EXIT_CASE_TONE } from '@/lib/status';
+import { AcceptanceBadge } from '@/features/assets/acceptance';
 import type { Allocation, AssetListItem, EmployeeDetail, HeldAsset, HistoryEvent } from '@/lib/types';
 import { cn, daysUntil, formatDate, formatDateTime, relativeTime } from '@/lib/utils';
 import { AccessDialog, type AccessInput, type Credentials, CredentialsDialog } from './access';
@@ -290,7 +291,9 @@ export default function EmployeeDetailPage() {
                       </Link>
                       {canAssign && (
                         <div className="flex items-center justify-between gap-2 border-t px-3 py-1.5 text-xs text-muted-foreground">
-                          <span className="whitespace-nowrap">Since {formatDate(h.assignedAt)}</span>
+                          <span className="flex items-center gap-1.5 whitespace-nowrap">
+                            Since {formatDate(h.assignedAt)} <AcceptanceBadge allocation={h} />
+                          </span>
                           <span className="flex gap-1">
                             <Button size="xs" variant="ghost" onClick={() => setDialog({ kind: 'transfer', asset: assetOf(h), allocation: allocationOf(h) })}>
                               <ArrowRightLeft /> Transfer

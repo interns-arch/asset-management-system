@@ -43,6 +43,9 @@ Tracks the build milestones so work can resume after any interruption.
 
 - [x] 19. "Add photos" on the asset page — add asset photos any time after the asset is created (2026-10-23)
 
+- [x] 20. Assignee accepts: items assigned to a person wait for them to accept (home page and asset page);
+       whoever assigned it is notified; IT sees "Waiting for acceptance" / "Accepted" (2026-10-26)
+
 ## Possible next steps
 - AI assistant on top of the permission-checked API (the design already allows it)
 - Email notifications (SMTP) in addition to in-app notifications

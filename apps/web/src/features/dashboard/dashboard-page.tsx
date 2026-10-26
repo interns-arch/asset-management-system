@@ -7,6 +7,7 @@ import { EmptyState, ErrorState, PageHeader, PageLoader, StatCard } from '@/comp
 import { Timeline } from '@/components/common/timeline';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, Progress } from '@/components/ui/primitives';
+import { AcceptButton } from '@/features/assets/acceptance';
 import { QueueCard } from '@/features/queue/queue-page';
 import { useQuickAdd } from '@/features/quick-add/quick-add';
 import { api } from '@/lib/api';
@@ -46,6 +47,7 @@ interface OrgDashboard {
 interface PersonalDashboard {
   scope: 'personal';
   myAssets: HeldAsset[];
+  toAccept: HeldAsset[];
   requests: {
     id: string;
     number: string;
@@ -412,6 +414,36 @@ function PersonalView({ data, name }: { data: PersonalDashboard; name?: string }
           </span>
         </button>
       </div>
+
+      {data.toAccept.length > 0 && (
+        <Card className="rounded-2xl border-amber-300 dark:border-amber-800">
+          <CardHeader>
+            <div>
+              <CardTitle className="text-base">Please accept</CardTitle>
+              <CardDescription>Confirm you received {data.toAccept.length > 1 ? 'these items' : 'this item'}</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {data.toAccept.map((a) => (
+                <li key={a.allocationId} className="flex items-center gap-3 rounded-xl border p-3">
+                  <AssetIcon icon={a.typeIcon ?? a.categoryIcon} color={a.categoryColor} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">
+                      {a.name}
+                      {a.quantity > 1 && <span className="text-muted-foreground"> ×{a.quantity}</span>}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      <span className="font-mono">{a.assetTag}</span> · given {formatDate(a.assignedAt)}
+                    </span>
+                  </span>
+                  <AcceptButton allocationId={a.allocationId} assetName={a.name} />
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Assets */}
       <Card className="rounded-2xl">

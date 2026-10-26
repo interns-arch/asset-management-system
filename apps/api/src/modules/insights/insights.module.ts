@@ -198,6 +198,9 @@ export class DashboardService {
   private async personal(actor: Actor) {
     const db = this.dbs.db;
     const myAssets = actor.employeeId ? await this.employees.assets(actor, actor.employeeId) : [];
+    // One-time items are not in "my assets" but still need accepting.
+    const given = actor.employeeId ? await this.employees.assets(actor, actor.employeeId, 'CONSUMED') : [];
+    const toAccept = [...myAssets, ...given].filter((a) => a.acceptance === 'PENDING');
     const [requests, myTickets, exit] = await Promise.all([
       actor.employeeId
         ? db
@@ -229,7 +232,7 @@ export class DashboardService {
             .where(and(eq(exitCases.employeeId, actor.employeeId), eq(exitCases.status, 'OPEN')))
         : [],
     ]);
-    return { scope: 'personal' as const, myAssets, requests, tickets: myTickets, openExit: exit[0] ?? null };
+    return { scope: 'personal' as const, myAssets, toAccept, requests, tickets: myTickets, openExit: exit[0] ?? null };
   }
 }
 

@@ -57,6 +57,10 @@ export type TrackingMode = (typeof TRACKING_MODES)[number];
 export const ALLOCATION_STATUSES = ['ACTIVE', 'RETURNED', 'TRANSFERRED', 'RELEASED', 'LOST', 'CONSUMED'] as const;
 export type AllocationStatus = (typeof ALLOCATION_STATUSES)[number];
 
+/** Whether the person an item was assigned to has accepted it. */
+export const ACCEPTANCE_STATUSES = ['PENDING', 'ACCEPTED'] as const;
+export type AcceptanceStatus = (typeof ACCEPTANCE_STATUSES)[number];
+
 /** JOINING: a new joiner being onboarded; becomes ACTIVE when they join. */
 export const EMPLOYEE_STATUSES = ['JOINING', 'ACTIVE', 'ON_LEAVE', 'NOTICE_PERIOD', 'EXITED'] as const;
 export type EmployeeStatus = (typeof EMPLOYEE_STATUSES)[number];

@@ -1,4 +1,5 @@
 import type {
+  AcceptanceStatus,
   AllocationStatus,
   AssetStatus,
   Attributes,
@@ -152,6 +153,8 @@ export interface Allocation {
   endedByName: string | null;
   returnCondition: Condition | null;
   endNotes: string | null;
+  acceptance: AcceptanceStatus | null;
+  acceptedAt: string | null;
   photos?: AllocationPhoto[];
 }
 
@@ -272,6 +275,8 @@ export interface HeldAsset {
   quantity: number;
   assignedAt: string;
   expectedReturnDate: string | null;
+  acceptance: AcceptanceStatus | null;
+  acceptedAt: string | null;
   assetId: string;
   assetTag: string;
   name: string;

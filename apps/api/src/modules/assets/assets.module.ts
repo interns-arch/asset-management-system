@@ -84,6 +84,13 @@ export class AssetsController {
     return this.assets.ownershipHistory(actor, id);
   }
 
+  /** No permission needed: only the person it was assigned to can accept (checked in the service). */
+  @Post('allocations/:allocationId/accept')
+  @HttpCode(200)
+  accept(@CurrentActor() actor: Actor, @Param('allocationId', ParseUUIDPipe) allocationId: string) {
+    return this.allocation.accept(actor, allocationId);
+  }
+
   @Post(':id/assign')
   @HttpCode(200)
   @RequirePermissions('asset:assign')

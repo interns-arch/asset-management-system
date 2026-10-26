@@ -18,6 +18,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import {
+  ACCEPTANCE_STATUSES,
   ALLOCATION_STATUSES,
   ASSET_STATUSES,
   CONDITIONS,
@@ -374,6 +375,9 @@ export const allocations = pgTable(
     endedByName: text('ended_by_name'),
     returnCondition: text('return_condition', { enum: CONDITIONS }),
     endNotes: text('end_notes'),
+    /** Items given to a person wait for them to accept; null for other holders and older assignments. */
+    acceptance: text('acceptance', { enum: ACCEPTANCE_STATUSES }),
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }),
   },
   (t) => [
     uniqueIndex('allocations_one_active_uq').on(t.assetId).where(sql`status = 'ACTIVE' and exclusive`),

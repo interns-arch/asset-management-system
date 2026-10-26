@@ -199,6 +199,8 @@ export class EmployeesService {
         quantity: allocations.quantity,
         assignedAt: allocations.assignedAt,
         expectedReturnDate: allocations.expectedReturnDate,
+        acceptance: allocations.acceptance,
+        acceptedAt: allocations.acceptedAt,
         assetId: assets.id,
         assetTag: assets.assetTag,
         name: assets.name,
